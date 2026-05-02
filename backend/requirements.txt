@@ -1,0 +1,51 @@
+# Web Framework
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+websockets==12.0
+
+# Database
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+alembic==1.13.3
+psycopg2-binary==2.9.9
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+
+# Async task queue
+celery==5.4.0
+redis==5.1.0
+kombu==5.3.7
+
+# File storage (S3-compatible)
+boto3==1.35.0
+minio==7.2.9
+
+# PPT parsing
+python-pptx==1.0.2
+Pillow==10.4.0
+python-magic==0.4.27
+
+# Word/PDF export
+python-docx==1.1.2
+reportlab==4.2.2
+weasyprint==62.3
+
+# LLM
+openai==1.51.0
+httpx==0.27.2
+tenacity==9.0.0
+
+# Utils
+pydantic==2.9.2
+pydantic-settings==2.5.2
+python-dotenv==1.0.1
+ujson==5.10.0
+orjson==3.10.7
+
+# Testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
+httpx==0.27.2
