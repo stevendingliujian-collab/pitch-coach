@@ -872,7 +872,7 @@ PRESET_SCENARIOS: list[dict] = [
         "difficulty": 4,
         "duration_min": 20,
         "description": "应对评委的刁难性问题、无理质疑和陷阱问题，保持专业和自信",
-        "background": "述标现场经常出现明显带有预设立场的刁难问题，甚至是竞争对手安排的"托儿"",
+        "background": "述标现场经常出现明显带有预设立场的刁难问题，甚至是竞争对手安排的「托儿」",
         "key_challenges": [
             "保持冷静，不被情绪影响",
             "识别陷阱问题并礼貌化解",

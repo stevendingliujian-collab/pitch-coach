@@ -67,7 +67,7 @@
           </div>
           <div>
             <div class="kn-stat-val">{{ citationCount }}</div>
-            <div class="kn-stat-lbl">本月引用次数</div>
+            <div class="kn-stat-lbl">已嵌入文档</div>
           </div>
         </div>
       </div>
@@ -237,7 +237,7 @@ const uploadForm = ref<{ doc_type: string; file: File | null; industry: string; 
 
 // Derived stats
 const totalChunks  = computed(() => documents.value.reduce((s, d) => s + (d.chunk_count ?? 0), 0))
-const citationCount = computed(() => 12) // TODO: from analytics API
+const citationCount = computed(() => documents.value.filter(d => d.embedding_status === 2).length)
 
 async function fetchDocs() {
   loading.value = true
