@@ -107,9 +107,17 @@ async def list_plans_by_task(
             PitchPlan.pitch_task_id == task_id,
             PitchPlan.tenant_id == current_user.tenant_id,
         )
-        .order_by(PitchPlan.version.desc())
+        .order_by(PitchPlan.version.desc(), PitchPlan.id.desc())
     )
-    return result.scalars().all()
+    plans = result.scalars().all()
+    for plan in plans:
+        for page in plan.pages:
+            if page.page_thumbnail_url:
+                try:
+                    page.page_thumbnail_url = get_presigned_download_url(page.page_thumbnail_url)
+                except Exception:
+                    pass
+    return plans
 
 
 @router.put("/{plan_id}/pages/{page_number}", response_model=PlanPageResponse)

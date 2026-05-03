@@ -1,10 +1,19 @@
 import asyncio
 import json
 from celery import Task
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from sqlalchemy.pool import NullPool
 from app.workers.celery_app import celery_app
 from app.core.config import get_settings
 
 settings = get_settings()
+
+
+def _make_session() -> async_sessionmaker:
+    """Create a fresh engine + session factory with NullPool for each Celery task run.
+    NullPool avoids event-loop mismatch errors when asyncio.run() is called repeatedly."""
+    engine = create_async_engine(settings.database_url, poolclass=NullPool)
+    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
 class DatabaseTask(Task):
@@ -28,7 +37,6 @@ def generate_plan_task(self, plan_id: int):
 
 async def _generate_plan(task: Task, plan_id: int):
     from sqlalchemy import select
-    from app.core.database import AsyncSessionLocal
     from app.models.pitch_plan import PitchPlan, PlanPage
     from app.models.pitch_task import PitchTask
     from app.services.ppt_parser import parse_pptx
@@ -36,7 +44,7 @@ async def _generate_plan(task: Task, plan_id: int):
     from app.core.storage import download_bytes, upload_bytes
     from app.core.ws_manager import ws_manager
 
-    async with AsyncSessionLocal() as db:
+    async with _make_session()() as db:
         result = await db.execute(select(PitchPlan).where(PitchPlan.id == plan_id))
         plan = result.scalar_one_or_none()
         if not plan:
@@ -96,6 +104,11 @@ async def _generate_plan(task: Task, plan_id: int):
 
             await progress(90, "saving_results")
 
+            # Remove any previously saved pages (handles retries)
+            from sqlalchemy import delete as sa_delete
+            await db.execute(sa_delete(PlanPage).where(PlanPage.plan_id == plan_id))
+            await db.flush()
+
             gs = llm_result.get("global_strategy", {})
             plan.global_strategy = json.dumps(gs, ensure_ascii=False)
             plan.total_duration_sec = gs.get("total_duration_sec")
@@ -148,7 +161,6 @@ def score_rehearsal_task(self, rehearsal_id: int):
 
 async def _score_rehearsal(task: Task, rehearsal_id: int):
     from sqlalchemy import select
-    from app.core.database import AsyncSessionLocal
     from app.models.rehearsal import Rehearsal
     from app.models.pitch_plan import PitchPlan, PlanPage
     from app.services.asr_adapter import transcribe
@@ -156,7 +168,7 @@ async def _score_rehearsal(task: Task, rehearsal_id: int):
     from app.core.storage import download_bytes
     from app.core.ws_manager import ws_manager
 
-    async with AsyncSessionLocal() as db:
+    async with _make_session()() as db:
         rehearsal = await db.get(Rehearsal, rehearsal_id)
         if not rehearsal:
             return

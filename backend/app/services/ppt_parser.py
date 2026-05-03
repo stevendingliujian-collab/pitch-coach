@@ -83,29 +83,48 @@ def _extract_notes(slide) -> str:
     return ""
 
 
+_SOFFICE = next(
+    (p for p in ["/usr/local/bin/soffice", "/usr/bin/soffice", "soffice", "libreoffice"]
+     if subprocess.run(["which", p.split("/")[-1]], capture_output=True).returncode == 0
+     or os.path.exists(p)),
+    "soffice",
+)
+
+
 def _render_thumbnails(pptx_path: str, output_dir: str, page_count: int) -> dict[int, bytes]:
-    """Use LibreOffice headless to convert PPTX slides to PNG images."""
+    """Convert PPTX → PDF via LibreOffice, then PDF → PNG per page via pdftoppm."""
     thumbnails: dict[int, bytes] = {}
+
+    # Step 1: PPTX → PDF
+    pdf_dir = os.path.join(output_dir, "pdf")
+    os.makedirs(pdf_dir, exist_ok=True)
     try:
         subprocess.run(
-            [
-                "libreoffice", "--headless", "--convert-to", "png",
-                "--outdir", output_dir, pptx_path,
-            ],
-            capture_output=True,
-            timeout=60,
-            check=True,
+            [_SOFFICE, "--headless", "--convert-to", "pdf", "--outdir", pdf_dir, pptx_path],
+            capture_output=True, timeout=60, check=True,
         )
     except (subprocess.CalledProcessError, FileNotFoundError):
         return thumbnails
 
-    # LibreOffice outputs deck-001.png, deck-002.png, ...
+    stem = os.path.splitext(os.path.basename(pptx_path))[0]
+    pdf_path = os.path.join(pdf_dir, f"{stem}.pdf")
+    if not os.path.exists(pdf_path):
+        return thumbnails
+
+    # Step 2: PDF → PNG per page via pdftoppm
+    png_prefix = os.path.join(output_dir, "slide")
+    try:
+        subprocess.run(
+            ["pdftoppm", "-png", "-r", "96", pdf_path, png_prefix],
+            capture_output=True, timeout=60, check=True,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return thumbnails
+
+    # pdftoppm outputs slide-1.png, slide-2.png ... or slide-01.png etc.
     for i in range(1, page_count + 1):
-        candidates = [
-            os.path.join(output_dir, f"deck-{i:03d}.png"),
-            os.path.join(output_dir, f"deck{i}.png"),
-        ]
-        for path in candidates:
+        for pad in (1, 2, 3):
+            path = f"{png_prefix}-{i:0{pad}d}.png"
             if os.path.exists(path):
                 thumbnails[i] = _resize_png(path, 640, 480)
                 break
