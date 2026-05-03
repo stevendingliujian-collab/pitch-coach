@@ -154,8 +154,9 @@
     <div class="sidebar-usage">
       <div class="usage-header">
         <span class="usage-label">本月项目用量</span>
-        <span class="usage-count" :class="{ warn: usagePercent >= 100 }">
-          {{ usedCount }}/{{ totalCount }} 已用尽
+        <span class="usage-count" :class="{ warn: usagePercent >= 80 }">
+          {{ usedCount }}/{{ totalCount }}
+          <span v-if="usagePercent >= 100">已用尽</span>
         </span>
       </div>
       <div class="usage-track">
@@ -187,6 +188,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import NotificationBell from '@/components/NotificationBell.vue'
+import { api } from '@/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -207,7 +209,10 @@ watch(collapsed, (v) => {
   applySidebarWidth(v)
 })
 
-onMounted(() => applySidebarWidth(collapsed.value))
+onMounted(() => {
+  applySidebarWidth(collapsed.value)
+  loadUsage()
+})
 
 function isActive(path: string) {
   return route.path === path || route.path.startsWith(path + '/')
@@ -225,10 +230,26 @@ const planLabel = computed(() => {
   return '免费版'
 })
 
-// Usage — using a reasonable default; quota service will provide real data via 402 responses
-const usedCount = computed(() => 3)
-const totalCount = computed(() => 3)
-const usagePercent = computed(() => (usedCount.value / totalCount.value) * 100)
+// Usage — real data from /subscription/usage
+const _usedCount = ref(0)
+const _totalCount = ref(3)
+const usedCount = computed(() => _usedCount.value)
+const totalCount = computed(() => _totalCount.value)
+const usagePercent = computed(() => _totalCount.value > 0 ? (_usedCount.value / _totalCount.value) * 100 : 0)
+
+async function loadUsage() {
+  try {
+    const res = await api.get<Record<string, { used: number; limit: number }>>('/subscription/usage')
+    // Show pitch_tasks usage as the primary meter
+    const tasksData = res.data?.pitch_tasks
+    if (tasksData) {
+      _usedCount.value = tasksData.used
+      _totalCount.value = tasksData.limit
+    }
+  } catch {
+    // Keep defaults if not logged in or quota check fails
+  }
+}
 
 function handleLogout() {
   auth.logout()

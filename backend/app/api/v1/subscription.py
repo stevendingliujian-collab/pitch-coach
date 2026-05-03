@@ -83,6 +83,16 @@ async def get_plan_status(
     }
 
 
+@router.get("/usage")
+async def get_usage_summary(
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Return current-month usage for the sidebar meter (pitch_tasks & rehearsals)."""
+    from app.services.quota_service import get_usage_summary
+    return await get_usage_summary(current_user, db)
+
+
 def _serialize(sub: Subscription) -> dict:
     return {
         "id": sub.id,
