@@ -170,6 +170,7 @@
         <div class="user-name">{{ auth.displayName }}</div>
         <div class="user-plan">{{ planLabel }}</div>
       </div>
+      <NotificationBell />
       <button class="user-settings" title="退出登录" @click="handleLogout">
         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6">
           <path d="M13 15l3-5-3-5"/>
@@ -185,6 +186,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import NotificationBell from '@/components/NotificationBell.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -399,6 +401,7 @@ function handleLogout() {
 .sidebar.collapsed .nav-badge,
 .sidebar.collapsed .sidebar-usage,
 .sidebar.collapsed .user-info,
+.sidebar.collapsed .notif-wrap,
 .sidebar.collapsed .collapse-btn {
   display: none;
 }

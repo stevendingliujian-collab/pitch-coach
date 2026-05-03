@@ -53,7 +53,7 @@ from app.middleware.feature_gate_middleware import FeatureGateMiddleware  # noqa
 app.add_middleware(FeatureGateMiddleware)
 
 # Register API routers
-from app.api.v1 import auth, pitch_tasks, pitch_plans, rehearsals, narrations, reviews, knowledge, training, daily_practice, conversion, subscription, team, rubrics, evaluators, billing, dashboard, post_mortem, scenarios, open_api, gamification, golden_scripts  # noqa: E402
+from app.api.v1 import auth, pitch_tasks, pitch_plans, rehearsals, narrations, reviews, knowledge, training, daily_practice, conversion, subscription, team, rubrics, evaluators, billing, dashboard, post_mortem, scenarios, open_api, gamification, golden_scripts, notifications  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(pitch_tasks.router, prefix="/api/v1")
@@ -76,6 +76,7 @@ app.include_router(scenarios.router, prefix="/api/v1")
 app.include_router(open_api.router, prefix="/api/v1")
 app.include_router(gamification.router, prefix="/api/v1")
 app.include_router(golden_scripts.router, prefix="/api/v1")
+app.include_router(notifications.router, prefix="/api/v1")
 
 
 @app.get("/health")
