@@ -112,6 +112,20 @@
               {{ today.status === 1 ? '再练一次' : '开始录音' }}
             </button>
             <p class="record-hint">点击后自动计时 · AI 完成后即时评分</p>
+
+            <!-- Shake hint for mobile -->
+            <div v-if="shakeSupported && !shakeListening && shakeNeedsPermission" class="shake-permission">
+              <button class="shake-enable-btn" @click="requestShakePermission">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M7 3C5.34 3 4 4.34 4 6v8c0 1.66 1.34 3 3 3h6c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3H7z"/>
+                  <path d="M10 14v1M8 2h4"/>
+                </svg>
+                开启摇一摇
+              </button>
+            </div>
+            <div v-else-if="shakeListening" class="shake-hint">
+              📳 摇动手机即可开始练习
+            </div>
           </template>
 
           <!-- RECORDING -->
@@ -285,6 +299,13 @@
       </div>
     </div>
   </div>
+
+  <!-- Shake toast overlay -->
+  <transition name="shake-toast">
+    <div v-if="shakeToast" class="shake-toast">
+      📳 摇一摇！开始录音…
+    </div>
+  </transition>
 </template>
 
 <script setup lang="ts">
@@ -298,6 +319,7 @@ import {
   type PracticeHistoryItem,
   type StreakInfo,
 } from '@/api/dailyPractice'
+import { useShakeGesture } from '@/composables/useShakeGesture'
 
 const router = useRouter()
 
@@ -323,6 +345,23 @@ let currentObjectKey = ''
 let currentUploadUrl = ''
 let timerHandle: ReturnType<typeof setInterval> | null = null
 
+// ─── 摇一摇开始练习 ────────────────────────────────────────────────
+const shakeToast = ref(false)
+const {
+  isSupported: shakeSupported,
+  isListening: shakeListening,
+  needsPermission: shakeNeedsPermission,
+  startListening: startShake,
+  requestAndStart: requestShakePermission,
+} = useShakeGesture(() => {
+  // Only trigger when idle and not loading
+  if (recState.value === 'idle' && !loading.value && today.value) {
+    shakeToast.value = true
+    setTimeout(() => { shakeToast.value = false }, 2000)
+    startRecording()
+  }
+})
+
 // ─── lifecycle ────────────────────────────────────────────────────
 onMounted(async () => {
   try {
@@ -338,6 +377,10 @@ onMounted(async () => {
     ElMessage.error('加载练习内容失败')
   } finally {
     loading.value = false
+    // Auto-start shake detection on Android (no permission required)
+    if (shakeSupported.value && !shakeNeedsPermission.value) {
+      startShake()
+    }
   }
 })
 
@@ -605,6 +648,55 @@ function scoreRingColor(score: number) {
 .record-btn-redo:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
 
 .record-hint { font-size: 12px; color: var(--t-faint); text-align: center; }
+
+/* Shake gesture */
+.shake-hint {
+  font-size: 12px;
+  color: #6366F1;
+  text-align: center;
+  animation: shake-pulse 2s ease-in-out infinite;
+}
+@keyframes shake-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.shake-permission { margin-top: 4px; }
+.shake-enable-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6366F1;
+  background: rgba(99,102,241,0.08);
+  border: 1px solid rgba(99,102,241,0.2);
+  border-radius: 20px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.shake-enable-btn:hover { background: rgba(99,102,241,0.15); }
+.shake-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(30, 41, 59, 0.9);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 14px 28px;
+  border-radius: 14px;
+  pointer-events: none;
+  z-index: 9999;
+  backdrop-filter: blur(8px);
+}
+.shake-toast-enter-active, .shake-toast-leave-active {
+  transition: opacity 0.3s, transform 0.3s;
+}
+.shake-toast-enter-from, .shake-toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -55%);
+}
 
 /* Recording active */
 .rec-active { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
