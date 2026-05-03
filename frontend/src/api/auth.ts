@@ -72,6 +72,10 @@ export const authApi = {
   login: (data: LoginPayload) =>
     api.post<TokenResponse>('/auth/login', data),
 
+  // CRM SSO
+  ssoLogin: (ssoToken: string) =>
+    api.post<TokenResponse>('/auth/sso/crm', null, { params: { sso_token: ssoToken } }),
+
   // Profile
   me: () => api.get<UserProfile>('/auth/me'),
 
