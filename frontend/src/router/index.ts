@@ -36,6 +36,8 @@ const router = createRouter({
     { path: '/open-api', name: 'openApi', component: () => import('@/views/OpenApiView.vue') },
     // P4 Gamification
     { path: '/achievements', name: 'achievements', component: () => import('@/views/GamificationView.vue') },
+    // P4 Golden Scripts (金牌话术库)
+    { path: '/golden-scripts', name: 'goldenScripts', component: () => import('@/views/GoldenScriptsView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },

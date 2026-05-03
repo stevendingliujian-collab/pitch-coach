@@ -96,3 +96,7 @@ class User(Base):
         # 公司名由 Tenant 维护，加分逻辑在调用侧处理（+20 if tenant.name != default）
         self.profile_completeness = score
         return score
+
+
+# Alias used in newer API modules (post_mortem, scenarios, open_api, gamification)
+PcUser = User

@@ -57,13 +57,12 @@
           <span>知识库</span>
         </router-link>
 
-        <div class="nav-item disabled" data-label="话术宝典（专业版）">
+        <router-link to="/golden-scripts" class="nav-item" :class="{ active: isActive('/golden-scripts') }" data-label="金牌话术库">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
             <polygon points="10 2 12.4 7.5 18.5 8.2 14 12.4 15.3 18.5 10 15.6 4.7 18.5 6 12.4 1.5 8.2 7.6 7.5"/>
           </svg>
-          <span>话术宝典</span>
-          <span class="nav-badge pro">专业版</span>
-        </div>
+          <span>金牌话术库</span>
+        </router-link>
       </div>
 
       <div class="nav-section">
