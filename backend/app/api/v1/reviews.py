@@ -260,7 +260,23 @@ async def certify_rehearsal(
     await db.commit()
     await db.refresh(cert)
 
-    # TODO: send notification (WeChat/Feishu webhook) — P1 later
+    # Push certification result to enterprise IM
+    try:
+        from app.services.notification_webhook import notify_certification_result
+        from app.models.user import PcUser
+        user_obj = await db.get(PcUser, body.user_id)
+        member_name = (user_obj.name or user_obj.email) if user_obj else f"用户 {body.user_id}"
+        task_obj = await db.get(PitchTask, body.pitch_task_id)
+        task_name = task_obj.name if task_obj else f"任务 {body.pitch_task_id}"
+        notify_certification_result(
+            task_name=task_name,
+            member_name=member_name,
+            passed=(decision_status == 1),
+            comments=body.comment or "",
+        )
+    except Exception:
+        pass  # notification failure must not break the API response
+
     return {
         "cert_id": cert.id,
         "status": "approved" if decision_status == 1 else "rejected",

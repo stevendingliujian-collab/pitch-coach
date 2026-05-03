@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     feishu_app_secret: str = ""
     feishu_redirect_uri: str = "http://localhost:5173/auth/feishu/callback"
 
+    # 企业 IM 群机器人 Webhook（通知推送）
+    wecom_webhook_url: str = ""      # 企业微信群机器人 Webhook URL
+    feishu_webhook_url: str = ""     # 飞书群机器人 Webhook URL
+    dingtalk_webhook_url: str = ""   # 钉钉群机器人 Webhook URL
+
     # LLM (DashScope / Qwen)
     llm_api_key: str = ""
     llm_base_url: str = "https://coding.dashscope.aliyuncs.com/v1"

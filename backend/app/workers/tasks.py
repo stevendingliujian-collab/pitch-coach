@@ -614,7 +614,39 @@ async def _bid_deadline_warning():
                 "48h bid warning — task_id=%s name=%s bid_date=%s tenant_id=%s",
                 row.id, row.name, row.bid_date, row.tenant_id,
             )
-        # TODO P2: push notification via 企微/飞书/钉钉 webhook
+
+            # Push to enterprise IM (企微/飞书/钉钉)
+            try:
+                from app.services.notification_webhook import notify_bid_deadline
+                from datetime import timezone
+                bid_dt = row.bid_date
+                if hasattr(bid_dt, 'tzinfo') and bid_dt.tzinfo is None:
+                    bid_dt = bid_dt.replace(tzinfo=timezone.utc)
+                hours_left = max(0, int((bid_dt - now.replace(tzinfo=timezone.utc)).total_seconds() / 3600))
+
+                # Compute readiness score (count completed SOP steps)
+                from app.models.pitch_task import PitchTask
+                from app.models.user import PcUser
+                task_obj = await db.get(PitchTask, row.id)
+                readiness_pct = getattr(task_obj, 'readiness_score', 0) or 0
+
+                # Get responsible user name
+                responsible_name = "团队成员"
+                if task_obj and task_obj.created_by:
+                    user_obj = await db.get(PcUser, task_obj.created_by)
+                    if user_obj:
+                        responsible_name = user_obj.name or user_obj.email or responsible_name
+
+                results = notify_bid_deadline(
+                    task_name=row.name,
+                    hours_left=hours_left,
+                    responsible_name=responsible_name,
+                    readiness_pct=readiness_pct,
+                )
+                if results:
+                    logger.info("Bid deadline notification sent: %s", results)
+            except Exception as notify_err:
+                logger.warning("Bid deadline notification failed: %s", notify_err)
 
 
 # ---------------------------------------------------------------------------
