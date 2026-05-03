@@ -25,6 +25,7 @@ export interface UserProfile {
   profile_completeness: number
   register_source: string
   created_at: string | null
+  subscription_plan: string | null
 }
 
 export interface WechatQrcodeResponse {

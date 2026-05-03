@@ -217,9 +217,13 @@ watch(collapsed, (v) => {
   applySidebarWidth(v)
 })
 
-onMounted(() => {
+onMounted(async () => {
   applySidebarWidth(collapsed.value)
   loadUsage()
+  // Ensure user profile (including subscription_plan) is loaded
+  if (auth.isLoggedIn && !auth.user) {
+    await auth.fetchMe()
+  }
 })
 
 function isActive(path: string) {
@@ -233,9 +237,11 @@ const displayInitial = computed(() => {
 
 const planLabel = computed(() => {
   const plan = (auth.user as any)?.subscription_plan
-  if (plan === 'pro') return '专业版'
-  if (plan === 'elite') return '旗舰版'
-  return '免费版'
+  if (!plan || plan === 'free') return '免费版'
+  if (plan.startsWith('pro')) return '专业版'
+  if (plan.startsWith('elite')) return '旗舰版'
+  if (plan === 'enterprise') return '企业版'
+  return plan
 })
 
 // Usage — real data from /subscription/usage

@@ -14,8 +14,7 @@ for _mod in _STUB_MODS:
     if _mod not in sys.modules:
         sys.modules[_mod] = types.ModuleType(_mod)
 
-for _attr in ("select", "Column", "Integer", "String", "Boolean", "DateTime",
-              "Text", "ForeignKey", "func", "and_", "or_"):
+for _attr in ("select", "update", "delete", "insert", "text", "Column", "Integer", "BigInteger", "SmallInteger", "String", "Boolean", "DateTime", "Date", "Text", "Float", "Numeric", "JSON", "JSONB", "ARRAY", "ForeignKey", "func", "and_", "or_", "not_", "case", "cast", "UniqueConstraint", "Index", "CheckConstraint", "PrimaryKeyConstraint", "relationship", "backref", "mapped_column", "Mapped", "DeclarativeBase", "declared_attr"):
     for _ns in ("sqlalchemy", "sqlalchemy.orm"):
         m = sys.modules[_ns]
         if not hasattr(m, _attr):
@@ -30,7 +29,7 @@ for _name in ("TrainingPlan", "TrainingSession"):
     setattr(sys.modules["app.models.training"], _name, type(_name, (), {}))
 for _name in ("PitchTask",):
     setattr(sys.modules["app.models.pitch_task"], _name, type(_name, (), {}))
-for _name in ("PlanPage",):
+for _name in ("PitchPlan", "PlanPage"):
     setattr(sys.modules["app.models.pitch_plan"], _name, type(_name, (), {}))
 
 # ── Actual imports ────────────────────────────────────────────────────────────

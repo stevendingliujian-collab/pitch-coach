@@ -60,3 +60,7 @@ class QASession(Base):
         Index("idx_qa_tenant_task", "tenant_id", "pitch_task_id"),
         Index("idx_qa_user", "user_id"),
     )
+
+
+# Alias for backward-compatibility (some modules import QaSession)
+QaSession = QASession

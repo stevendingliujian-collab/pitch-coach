@@ -26,7 +26,7 @@ def client():
 
 @pytest.fixture(scope="module")
 def auth_headers(client):
-    """Register a fresh test user and return auth headers."""
+    """Register a fresh test user, upgrade to pro, and return auth headers."""
     import random
     suffix = random.randint(10000, 99999)
     email = f"e2e_test_{suffix}@example.com"
@@ -43,6 +43,20 @@ def auth_headers(client):
     # Login
     r = client.post("/auth/login", json={"email": email, "password": "TestPass123!"})
     assert r.status_code == 200, f"Login failed: {r.text}"
+    token = r.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Upgrade to pro so all E2E tests can run without 402 gates
+    r = client.post("/billing/upgrade", headers=headers, json={
+        "plan_type": "pro_10",
+        "billing_cycle": "monthly",
+    })
+    # 200/201 = success; ignore if billing API not available
+    assert r.status_code in (200, 201), f"Pro upgrade failed: {r.text}"
+
+    # Re-login to get a fresh token reflecting the new plan
+    r = client.post("/auth/login", json={"email": email, "password": "TestPass123!"})
+    assert r.status_code == 200, f"Re-login failed: {r.text}"
     token = r.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 

@@ -108,6 +108,7 @@ class UserProfile(BaseModel):
     profile_completeness: int = 0
     register_source: str = "web"
     created_at: Optional[datetime] = None
+    subscription_plan: Optional[str] = None  # resolved from Subscription table
 
     model_config = {"from_attributes": True}
 

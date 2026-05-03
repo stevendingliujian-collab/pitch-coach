@@ -105,7 +105,22 @@ async def create_task(
     await track_event("ppt_uploaded", current_user, db,
                       properties={"task_id": task.id, "task_name": task.name})
     await db.commit()
-    return task
+    return PitchTaskResponse(
+        id=task.id,
+        name=task.name,
+        customer_name=task.customer_name,
+        customer_industry=task.customer_industry,
+        budget=task.budget,
+        bid_date=task.bid_date,
+        bid_time_limit=task.bid_time_limit,
+        status=task.status,
+        result=task.result,
+        owner_id=task.owner_id,
+        rehearsal_count=0,
+        best_score=None,
+        readiness_score=0,
+        created_at=task.created_at.date() if task.created_at else None,
+    )
 
 
 @router.get("/{task_id}", response_model=PitchTaskResponse)
@@ -115,7 +130,22 @@ async def get_task(
     db: AsyncSession = Depends(get_db),
 ):
     task = await _get_task_or_404(task_id, current_user.tenant_id, db)
-    return task
+    return PitchTaskResponse(
+        id=task.id,
+        name=task.name,
+        customer_name=task.customer_name,
+        customer_industry=task.customer_industry,
+        budget=task.budget,
+        bid_date=task.bid_date,
+        bid_time_limit=task.bid_time_limit,
+        status=task.status,
+        result=task.result,
+        owner_id=task.owner_id,
+        rehearsal_count=0,
+        best_score=None,
+        readiness_score=0,
+        created_at=task.created_at.date() if task.created_at else None,
+    )
 
 
 @router.patch("/{task_id}", response_model=PitchTaskResponse)
@@ -130,7 +160,22 @@ async def update_task(
         setattr(task, field, value)
     await db.commit()
     await db.refresh(task)
-    return task
+    return PitchTaskResponse(
+        id=task.id,
+        name=task.name,
+        customer_name=task.customer_name,
+        customer_industry=task.customer_industry,
+        budget=task.budget,
+        bid_date=task.bid_date,
+        bid_time_limit=task.bid_time_limit,
+        status=task.status,
+        result=task.result,
+        owner_id=task.owner_id,
+        rehearsal_count=0,
+        best_score=None,
+        readiness_score=0,
+        created_at=task.created_at.date() if task.created_at else None,
+    )
 
 
 @router.delete("/{task_id}", status_code=204)
@@ -159,7 +204,22 @@ async def set_outcome(
     task.result = result_val
     await db.commit()
     await db.refresh(task)
-    return task
+    return PitchTaskResponse(
+        id=task.id,
+        name=task.name,
+        customer_name=task.customer_name,
+        customer_industry=task.customer_industry,
+        budget=task.budget,
+        bid_date=task.bid_date,
+        bid_time_limit=task.bid_time_limit,
+        status=task.status,
+        result=task.result,
+        owner_id=task.owner_id,
+        rehearsal_count=0,
+        best_score=None,
+        readiness_score=0,
+        created_at=task.created_at.date() if task.created_at else None,
+    )
 
 
 @router.get("/{task_id}/readiness")

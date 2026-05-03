@@ -574,8 +574,12 @@ async def crm_sso(sso_token: str, db: AsyncSession = Depends(get_db)):
 # ═════════════════════════════════════════════════════════════════════════════
 
 @router.get("/me", response_model=UserProfile)
-async def me(current_user: User = Depends(get_current_user)):
-    return current_user
+async def me(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    plan = await _get_effective_plan(current_user, db)
+    # Build a response dict so we can inject subscription_plan
+    profile = UserProfile.model_validate(current_user)
+    profile.subscription_plan = plan
+    return profile
 
 
 @router.put("/profile", response_model=UserProfile)

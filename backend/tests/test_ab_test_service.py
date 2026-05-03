@@ -8,7 +8,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # Stub heavy deps so pure-logic functions can be imported without a full stack
 _STUB_MODS = [
     "sqlalchemy", "sqlalchemy.orm", "sqlalchemy.ext", "sqlalchemy.ext.asyncio",
-    "pydantic", "pydantic.v1",
     "app.core.database", "app.models.ab_test",
     "app.core.security", "app.models.user",
 ]
@@ -16,20 +15,53 @@ for _mod in _STUB_MODS:
     if _mod not in sys.modules:
         sys.modules[_mod] = types.ModuleType(_mod)
 
-# Populate common sqlalchemy symbols
-for _attr in ("select", "Column", "Integer", "String", "Boolean", "DateTime",
-              "Text", "SmallInteger", "ForeignKey", "Index", "UniqueConstraint",
-              "func", "and_", "or_", "insert", "update", "delete"):
+# ── SQLAlchemy stubs ──────────────────────────────────────────────────────────
+
+class _FuncProxy:
+    """Proxy for sqlalchemy.func — supports attribute access like func.now()."""
+    def __call__(self, *a, **kw): return None
+    def __getattr__(self, name): return lambda *a, **kw: None
+
+class _MappedType:
+    """Stub for sqlalchemy.orm.Mapped — supports Mapped[int] subscript syntax."""
+    def __class_getitem__(cls, item): return cls
+
+class _NullCallable:
+    """Generic stub that returns None for calls and None for getattr."""
+    def __call__(self, *a, **kw): return None
+    def __getitem__(self, item): return None
+
+for _attr in ("select", "update", "delete", "insert", "text", "Column", "Integer",
+              "BigInteger", "SmallInteger", "String", "Boolean", "DateTime", "Date",
+              "Text", "Float", "Numeric", "JSON", "JSONB", "ARRAY", "ForeignKey",
+              "and_", "or_", "not_", "case", "cast", "UniqueConstraint", "Index",
+              "CheckConstraint", "PrimaryKeyConstraint", "relationship", "backref",
+              "mapped_column", "DeclarativeBase", "declared_attr"):
     for _ns in ("sqlalchemy", "sqlalchemy.orm"):
-        mod = sys.modules[_ns]
-        if not hasattr(mod, _attr):
-            setattr(mod, _attr, lambda *a, **kw: None)
+        m = sys.modules[_ns]
+        if not hasattr(m, _attr):
+            setattr(m, _attr, lambda *a, **kw: None)
+
+# Override special stubs that need more than a plain lambda
+for _ns in ("sqlalchemy", "sqlalchemy.orm"):
+    sys.modules[_ns].func = _FuncProxy()
+    sys.modules[_ns].Mapped = _MappedType
 
 # AsyncSession stub
 _asyncio_mod = sys.modules["sqlalchemy.ext.asyncio"]
 if not hasattr(_asyncio_mod, "AsyncSession"):
     class _AsyncSession: pass  # type: ignore
     _asyncio_mod.AsyncSession = _AsyncSession  # type: ignore
+
+# app.core.database needs Base + get_db
+_db_mod = sys.modules["app.core.database"]
+if not hasattr(_db_mod, "Base"):
+    class _Base:
+        metadata = type("metadata", (), {"create_all": lambda *a, **kw: None})()
+    _db_mod.Base = _Base  # type: ignore
+if not hasattr(_db_mod, "get_db"):
+    async def _get_db(): yield None
+    _db_mod.get_db = _get_db  # type: ignore
 
 # Model stubs
 class _ModelStub:

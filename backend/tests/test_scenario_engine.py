@@ -14,7 +14,7 @@ for _mod in _STUB_MODS:
     if _mod not in sys.modules:
         sys.modules[_mod] = types.ModuleType(_mod)
 
-for _attr in ("select", "func", "and_", "Column", "Integer", "String"):
+for _attr in ("select", "update", "delete", "insert", "text", "Column", "Integer", "BigInteger", "SmallInteger", "String", "Boolean", "DateTime", "Date", "Text", "Float", "Numeric", "JSON", "JSONB", "ARRAY", "ForeignKey", "func", "and_", "or_", "not_", "case", "cast", "UniqueConstraint", "Index", "CheckConstraint", "PrimaryKeyConstraint", "relationship", "backref", "mapped_column", "Mapped", "DeclarativeBase", "declared_attr"):
     for _ns in ("sqlalchemy", "sqlalchemy.orm"):
         m = sys.modules[_ns]
         if not hasattr(m, _attr):
@@ -29,6 +29,13 @@ if not hasattr(_asyncio_mod, "AsyncSession"):
 _llm_mod = sys.modules["app.services.llm_adapter"]
 async def _fake_llm(*a, **kw): return "stub response"
 _llm_mod.call_llm = _fake_llm  # type: ignore
+
+# Stub asr_adapter with _stub_transcribe so test_e2e_p1 can import it
+_asr_mod = sys.modules["app.services.asr_adapter"]
+def _stub_transcribe(audio_bytes: bytes):
+    return [{"text": "stub transcript", "start": 0.0, "end": 1.0}]
+_asr_mod._stub_transcribe = _stub_transcribe  # type: ignore
+_asr_mod.transcribe = lambda *a, **kw: None  # type: ignore
 
 from app.services.scenario_engine import (
     calculate_adaptive_difficulty,
