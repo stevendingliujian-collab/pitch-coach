@@ -257,6 +257,90 @@ def verify_signature(payload: bytes, secret: str, signature_header: str) -> bool
       </div>
     </div>
 
+    <!-- MCP Tools Tab -->
+    <div v-if="activeTab === 'mcp'" class="tab-content">
+      <div class="docs-content">
+        <h2>MCP 工具接口</h2>
+        <p class="dim">OpenClaw / Claude Agent 可通过标准 MCP 协议调用以下工具，实现与述标教练的智能联动。</p>
+
+        <!-- Tool manifest link -->
+        <div class="info-box" style="margin-bottom:20px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>工具清单端点：<code>GET /api/v1/open-api/mcp/manifest</code>（需 JWT 或 API Key 认证）</span>
+        </div>
+
+        <!-- Tool cards -->
+        <div class="mcp-tools-grid">
+          <div class="mcp-tool-card">
+            <div class="mcp-tool-header">
+              <code class="mcp-tool-name">pitch_coach_check_readiness</code>
+              <span class="mcp-scope-badge">read</span>
+            </div>
+            <p class="mcp-tool-desc">检查指定述标任务的 SOP 就绪状态（7步清单），返回每步完成情况、排练次数和最高分。</p>
+            <div class="mcp-tool-section">
+              <div class="mcp-param-label">输入参数</div>
+              <div class="mcp-param-row"><code>task_id</code><span>integer · required</span><span class="mcp-param-desc">述标任务 ID</span></div>
+            </div>
+            <div class="mcp-tool-section">
+              <div class="mcp-param-label">调用示例</div>
+              <pre class="code-block">curl -X POST /api/v1/open-api/mcp/tools/pitch_coach_check_readiness \
+  -H "Authorization: Bearer pc_live_xxx..." \
+  -H "Content-Type: application/json" \
+  -d '{"task_id": 42}'</pre>
+            </div>
+          </div>
+
+          <div class="mcp-tool-card">
+            <div class="mcp-tool-header">
+              <code class="mcp-tool-name">pitch_coach_get_practice_status</code>
+              <span class="mcp-scope-badge">read</span>
+            </div>
+            <p class="mcp-tool-desc">获取租户整体练习状态统计：总排练次数、平均分、活跃成员数、练习天数、最高分。</p>
+            <div class="mcp-tool-section">
+              <div class="mcp-param-label">输入参数</div>
+              <div class="mcp-param-row"><code>days</code><span>integer · optional · default 30</span><span class="mcp-param-desc">统计近 N 天</span></div>
+            </div>
+            <div class="mcp-tool-section">
+              <div class="mcp-param-label">调用示例</div>
+              <pre class="code-block">curl -X POST /api/v1/open-api/mcp/tools/pitch_coach_get_practice_status \
+  -H "Authorization: Bearer pc_live_xxx..." \
+  -d '{"days": 7}'</pre>
+            </div>
+          </div>
+
+          <div class="mcp-tool-card">
+            <div class="mcp-tool-header">
+              <code class="mcp-tool-name">pitch_coach_log_practice</code>
+              <span class="mcp-scope-badge write">write</span>
+            </div>
+            <p class="mcp-tool-desc">从外部系统（CRM/OA）记录一次练习事件，统计用，不含真实录音。</p>
+            <div class="mcp-tool-section">
+              <div class="mcp-param-label">输入参数</div>
+              <div class="mcp-param-row"><code>task_id</code><span>integer · required</span><span class="mcp-param-desc">述标任务 ID</span></div>
+              <div class="mcp-param-row"><code>user_id</code><span>integer · required</span><span class="mcp-param-desc">用户 ID</span></div>
+              <div class="mcp-param-row"><code>duration_sec</code><span>integer · required</span><span class="mcp-param-desc">练习时长（秒）</span></div>
+              <div class="mcp-param-row"><code>score</code><span>number · optional</span><span class="mcp-param-desc">外部评分 0-100</span></div>
+              <div class="mcp-param-row"><code>note</code><span>string · optional</span><span class="mcp-param-desc">练习备注</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OpenClaw config snippet -->
+        <div class="doc-section" style="margin-top:28px">
+          <h3>在 OpenClaw 中配置</h3>
+          <p>将以下配置添加到 <code>.openclaw/mcp.yaml</code>：</p>
+          <pre class="code-block">servers:
+  pitch_coach:
+    url: https://your-domain.com/api/v1/open-api/mcp/manifest
+    auth:
+      type: bearer
+      token: pc_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</pre>
+        </div>
+      </div>
+    </div>
+
     <!-- ─── Modals ─────────────────────────────────────────────────────────── -->
 
     <!-- Create API Key modal -->
@@ -453,6 +537,7 @@ const tabs = [
   { id: 'webhooks', label: '⚡ Webhooks' },
   { id: 'usage', label: '📊 用量统计' },
   { id: 'docs', label: '📖 文档' },
+  { id: 'mcp', label: '🤖 MCP 工具' },
 ]
 const activeTab = ref('keys')
 
@@ -992,4 +1077,32 @@ onMounted(async () => {
 .dim { color: #9ca3af; font-size: 13px; }
 code { font-family: monospace; }
 p { margin: 0 0 12px; line-height: 1.6; }
+
+/* MCP Tools */
+.mcp-tools-grid { display: flex; flex-direction: column; gap: 16px; }
+.mcp-tool-card {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 18px 20px;
+}
+.mcp-tool-header {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.mcp-tool-name { font-size: 14px; color: #1a1a2e; font-weight: 600; }
+.mcp-scope-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 99px;
+  background: #e0e7ff; color: #4338ca; font-weight: 600;
+}
+.mcp-scope-badge.write { background: #fef3c7; color: #92400e; }
+.mcp-tool-desc { font-size: 13px; color: #6b7280; margin: 0 0 14px; }
+.mcp-tool-section { margin-top: 12px; }
+.mcp-param-label { font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+.mcp-param-row {
+  display: grid; grid-template-columns: 160px 1fr 1fr;
+  gap: 8px; font-size: 12px; padding: 4px 0;
+  border-bottom: 1px solid #f3f4f6;
+  align-items: baseline;
+}
+.mcp-param-row code { color: #6366F1; }
+.mcp-param-row span { color: #6b7280; }
+.mcp-param-desc { color: #374151 !important; }
 </style>
