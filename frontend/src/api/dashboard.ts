@@ -39,9 +39,22 @@ export interface TaskReadiness {
   last_rehearsed: string | null
 }
 
+export interface DashboardROI {
+  total_practice_min: number
+  total_rehearsals: number
+  score_improvement: number | null
+  first_avg_score: number | null
+  recent_avg_score: number | null
+  win_rate: number | null
+  won_count: number
+  total_outcomes: number
+  won_budget_total: number  // 万元
+}
+
 export const dashboardApi = {
   getOverview: () => api.get<DashboardOverview>('/dashboard/overview'),
   getTrend: (days?: number) => api.get<{ days: number; points: TrendPoint[] }>('/dashboard/trend', { params: days ? { days } : {} }),
   getMembers: () => api.get<MemberStat[]>('/dashboard/members'),
   getTasks: () => api.get<TaskReadiness[]>('/dashboard/tasks'),
+  getRoi: () => api.get<DashboardROI>('/dashboard/roi'),
 }

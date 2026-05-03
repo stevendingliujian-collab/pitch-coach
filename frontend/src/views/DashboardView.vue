@@ -118,6 +118,66 @@
         </div>
       </div>
 
+      <!-- ROI Panel -->
+      <div class="chart-card roi-card">
+        <div class="chart-header">
+          <span class="chart-title">训练价值 ROI</span>
+          <span class="chart-sub">量化述标训练的业务价值</span>
+        </div>
+        <div v-if="!roi" class="no-data">加载中…</div>
+        <div v-else class="roi-grid">
+          <div class="roi-item">
+            <div class="roi-icon" style="background:rgba(99,102,241,0.1)">
+              <svg viewBox="0 0 16 16" fill="none" stroke="#6366F1" stroke-width="1.8">
+                <circle cx="8" cy="8" r="6.5"/><polyline points="8 5 8 8 10 10"/>
+              </svg>
+            </div>
+            <div class="roi-val">{{ roi.total_practice_min }}<span class="roi-unit">分钟</span></div>
+            <div class="roi-label">累计练习时长</div>
+            <div class="roi-sub">共 {{ roi.total_rehearsals }} 次排练</div>
+          </div>
+          <div class="roi-item">
+            <div class="roi-icon" style="background:rgba(34,197,94,0.1)">
+              <svg viewBox="0 0 16 16" fill="none" stroke="#22C55E" stroke-width="1.8">
+                <polyline points="2 12 5 8 8 10 12 4 14 6"/>
+              </svg>
+            </div>
+            <div class="roi-val" :class="roi.score_improvement && roi.score_improvement > 0 ? 'positive' : ''">
+              {{ roi.score_improvement !== null ? (roi.score_improvement > 0 ? '+' : '') + roi.score_improvement : '—' }}
+              <span class="roi-unit" v-if="roi.score_improvement !== null">分</span>
+            </div>
+            <div class="roi-label">得分提升</div>
+            <div class="roi-sub" v-if="roi.first_avg_score">
+              首次均分 {{ roi.first_avg_score }} → 近期 {{ roi.recent_avg_score }}
+            </div>
+            <div class="roi-sub" v-else>暂无足够数据</div>
+          </div>
+          <div class="roi-item">
+            <div class="roi-icon" style="background:rgba(249,115,22,0.1)">
+              <svg viewBox="0 0 16 16" fill="none" stroke="#F97316" stroke-width="1.8">
+                <path d="M8 2l1.5 3.5 3.5.5-2.5 2.5.6 3.5L8 10.5 4.9 12l.6-3.5L3 6l3.5-.5z"/>
+              </svg>
+            </div>
+            <div class="roi-val" :class="roi.win_rate !== null && roi.win_rate >= 60 ? 'positive' : ''">
+              {{ roi.win_rate !== null ? roi.win_rate + '%' : '—' }}
+            </div>
+            <div class="roi-label">赢单率</div>
+            <div class="roi-sub">{{ roi.won_count }} 中标 / {{ roi.total_outcomes }} 已知结果</div>
+          </div>
+          <div class="roi-item">
+            <div class="roi-icon" style="background:rgba(245,158,11,0.1)">
+              <svg viewBox="0 0 16 16" fill="none" stroke="#F59E0B" stroke-width="1.8">
+                <rect x="2" y="4" width="12" height="9" rx="1.5"/>
+                <path d="M5 4V3a3 3 0 0 1 6 0v1"/><line x1="8" y1="8" x2="8" y2="10"/>
+              </svg>
+            </div>
+            <div class="roi-val">{{ roi.won_budget_total > 0 ? roi.won_budget_total + '万' : '—' }}</div>
+            <div class="roi-label">已中标金额</div>
+            <div class="roi-sub">有预算的中标项目</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Task readiness table -->
       <div class="chart-card tasks-card">
         <div class="chart-header">
@@ -185,28 +245,31 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { dashboardApi, type DashboardOverview, type TrendPoint, type MemberStat, type TaskReadiness } from '@/api/dashboard'
+import { dashboardApi, type DashboardOverview, type TrendPoint, type MemberStat, type TaskReadiness, type DashboardROI } from '@/api/dashboard'
 
 const loading = ref(true)
 const overview = ref<DashboardOverview | null>(null)
 const trendData = ref<{ days: number; points: TrendPoint[] } | null>(null)
 const members = ref<MemberStat[]>([])
 const tasks = ref<TaskReadiness[]>([])
+const roi = ref<DashboardROI | null>(null)
 const trendDays = ref(30)
 const chartEl = ref<HTMLElement | null>(null)
 const chartW = ref(500)
 
 onMounted(async () => {
-  const [ovRes, trendRes, membersRes, tasksRes] = await Promise.allSettled([
+  const [ovRes, trendRes, membersRes, tasksRes, roiRes] = await Promise.allSettled([
     dashboardApi.getOverview(),
     dashboardApi.getTrend(trendDays.value),
     dashboardApi.getMembers(),
     dashboardApi.getTasks(),
+    dashboardApi.getRoi(),
   ])
   if (ovRes.status === 'fulfilled') overview.value = ovRes.value.data
   if (trendRes.status === 'fulfilled') trendData.value = trendRes.value.data
   if (membersRes.status === 'fulfilled') members.value = membersRes.value.data
   if (tasksRes.status === 'fulfilled') tasks.value = tasksRes.value.data
+  if (roiRes.status === 'fulfilled') roi.value = roiRes.value.data
   loading.value = false
 
   await nextTick()
@@ -574,13 +637,43 @@ function formatRelative(iso: string) {
 .orange { color: #F97316; }
 .red { color: #EF4444; }
 
+/* ROI Panel */
+.roi-card { }
+.roi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.roi-item {
+  background: white; padding: 20px 16px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+}
+.roi-icon {
+  width: 36px; height: 36px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 8px;
+}
+.roi-icon svg { width: 18px; height: 18px; }
+.roi-val {
+  font-size: 28px; font-weight: 800; color: #1a1a2e; line-height: 1;
+}
+.roi-val .roi-unit { font-size: 14px; font-weight: 500; color: #6b7280; margin-left: 2px; }
+.roi-val.positive { color: #16a34a; }
+.roi-label { font-size: 13px; font-weight: 600; color: #374151; margin-top: 4px; }
+.roi-sub { font-size: 11px; color: #9ca3af; }
+
 @media (max-width: 1024px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
   .charts-row { grid-template-columns: 1fr; }
   .tasks-header, .tasks-row { grid-template-columns: 1fr 90px 70px 150px 50px; }
   .tc-count { display: none; }
+  .roi-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 640px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .roi-grid { grid-template-columns: repeat(2, 1fr); }
 }
 </style>

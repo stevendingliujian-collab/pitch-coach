@@ -256,3 +256,101 @@ async def get_task_readiness(
         })
 
     return result
+
+
+@router.get("/roi")
+async def get_roi(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    ROI 计算器 — 量化述标训练价值：
+    - 总练习时长（分钟）
+    - 得分提升（首次 vs 最近均值）
+    - 赢单率（已知结果的任务中中标比例）
+    - 已参与的述标金额（已中标任务预算合计）
+    """
+    tenant_id = current_user.tenant_id
+
+    # ── 练习时长（所有已评分排练 audio_duration 秒求和）──────────────────────
+    dur_res = await db.execute(
+        select(func.sum(Rehearsal.audio_duration)).where(
+            Rehearsal.tenant_id == tenant_id,
+            Rehearsal.status >= 3,
+        )
+    )
+    total_duration_sec = int(dur_res.scalar_one() or 0)
+    total_practice_min = round(total_duration_sec / 60)
+
+    # ── 得分提升（首次排练均分 vs 最近30天均分）───────────────────────────────
+    # earliest 5 rehearsals
+    first_res = await db.execute(
+        select(func.avg(Rehearsal.total_score)).where(
+            Rehearsal.tenant_id == tenant_id,
+            Rehearsal.status >= 3,
+            Rehearsal.total_score.isnot(None),
+        ).order_by(Rehearsal.created_at.asc()).limit(5)
+    )
+    first_avg = float(first_res.scalar_one() or 0)
+
+    # recent 30 days
+    since_30 = datetime.utcnow() - timedelta(days=30)
+    recent_res = await db.execute(
+        select(func.avg(Rehearsal.total_score)).where(
+            Rehearsal.tenant_id == tenant_id,
+            Rehearsal.status >= 3,
+            Rehearsal.total_score.isnot(None),
+            Rehearsal.created_at >= since_30,
+        )
+    )
+    recent_avg = float(recent_res.scalar_one() or 0)
+    score_improvement = round(recent_avg - first_avg, 1) if first_avg > 0 else None
+
+    # ── 赢单率 ──────────────────────────────────────────────────────────────
+    outcome_res = await db.execute(
+        select(
+            PitchTask.result,
+            func.count(PitchTask.id).label("cnt"),
+        ).where(
+            PitchTask.tenant_id == tenant_id,
+            PitchTask.result.isnot(None),
+        ).group_by(PitchTask.result)
+    )
+    outcome_counts: dict[int, int] = {}
+    for row in outcome_res.all():
+        outcome_counts[row.result] = row.cnt
+
+    won_count = outcome_counts.get(1, 0)
+    total_outcomes = sum(outcome_counts.values())
+    win_rate = round(won_count / total_outcomes * 100) if total_outcomes > 0 else None
+
+    # ── 已中标项目预算合计 ────────────────────────────────────────────────────
+    budget_res = await db.execute(
+        select(func.sum(PitchTask.budget)).where(
+            PitchTask.tenant_id == tenant_id,
+            PitchTask.result == 1,
+            PitchTask.budget.isnot(None),
+        )
+    )
+    won_budget_total = float(budget_res.scalar_one() or 0)
+
+    # ── 总排练次数 ─────────────────────────────────────────────────────────────
+    count_res = await db.execute(
+        select(func.count(Rehearsal.id)).where(
+            Rehearsal.tenant_id == tenant_id,
+            Rehearsal.status >= 3,
+        )
+    )
+    total_rehearsals = int(count_res.scalar_one() or 0)
+
+    return {
+        "total_practice_min": total_practice_min,
+        "total_rehearsals": total_rehearsals,
+        "score_improvement": score_improvement,
+        "first_avg_score": round(first_avg, 1) if first_avg > 0 else None,
+        "recent_avg_score": round(recent_avg, 1) if recent_avg > 0 else None,
+        "win_rate": win_rate,
+        "won_count": won_count,
+        "total_outcomes": total_outcomes,
+        "won_budget_total": round(won_budget_total / 10000, 1),  # convert to 万元
+    }
