@@ -301,6 +301,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { pitchTaskApi, type PitchTask } from '@/api/pitchTask'
+import { dashboardApi } from '@/api/dashboard'
+import { gamificationApi } from '@/api/gamification'
 import dayjs from 'dayjs'
 import { useConversion } from '@/composables/useConversion'
 
@@ -312,6 +314,8 @@ const showCreate = ref(false)
 const showImport = ref(false)
 const creating = ref(false)
 const createFormRef = ref<FormInstance>()
+const avgScoreReal = ref<number | null>(null)
+const streakReal = ref<number>(0)
 
 const INDUSTRIES = ['非标自动化', '系统集成', '软件开发', '信息化', '工业互联网', '其他']
 
@@ -323,15 +327,23 @@ const createRules: FormRules = {
   name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
 }
 
-// Stats (use real data when available)
-const recentCount  = computed(() => tasks.value.filter(t => dayjs(t.created_at).isAfter(dayjs().startOf('month'))).length)
+// Stats — real data from APIs
+const recentCount     = computed(() => tasks.value.filter(t => dayjs(t.created_at).isAfter(dayjs().startOf('month'))).length)
 const totalRehearsals = computed(() => tasks.value.reduce((s, t) => s + (t.rehearsal_count ?? 0), 0))
-const avgScore  = computed(() => 82) // TODO: from analytics API
-const streak    = computed(() => 5)  // TODO: from user_streak API
+const avgScore  = computed(() => avgScoreReal.value ?? '—')
+const streak    = computed(() => streakReal.value)
 
 onMounted(async () => {
   loading.value = true
-  try { tasks.value = (await pitchTaskApi.list()).data } finally { loading.value = false }
+  const [tasksRes, overviewRes, streakRes] = await Promise.allSettled([
+    pitchTaskApi.list(),
+    dashboardApi.getOverview(),
+    gamificationApi.streak(),
+  ])
+  if (tasksRes.status === 'fulfilled') tasks.value = tasksRes.value.data
+  if (overviewRes.status === 'fulfilled') avgScoreReal.value = overviewRes.value.data.avg_score
+  if (streakRes.status === 'fulfilled') streakReal.value = streakRes.value.data.current_streak
+  loading.value = false
 })
 
 async function handleCreate() {
