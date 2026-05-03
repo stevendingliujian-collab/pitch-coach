@@ -69,15 +69,14 @@
       <div class="nav-section">
         <div class="nav-section-label">分析</div>
 
-        <div class="nav-item disabled" data-label="进步看板（专业版）">
+        <router-link to="/dashboard" class="nav-item" :class="{ active: isActive('/dashboard') }" data-label="进步看板">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
             <polyline points="2 14 7 9 11 13 18 5"/>
             <line x1="18" y1="5" x2="18" y2="9"/>
             <line x1="14" y1="5" x2="18" y2="5"/>
           </svg>
           <span>进步看板</span>
-          <span class="nav-badge pro">专业版</span>
-        </div>
+        </router-link>
 
         <router-link to="/evaluator" class="nav-item" :class="{ active: isActive('/evaluator') }" data-label="评委模拟">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
