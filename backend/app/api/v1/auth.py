@@ -35,6 +35,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.models.subscription import Subscription
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.auth import (
@@ -200,9 +201,7 @@ async def _find_or_create_user(
     return user, True
 
 
-def _make_token(user: User) -> str:
-    settings = get_settings()
-    plan = "free"  # TODO P2: read from subscription table
+def _make_token(user: User, plan: str = "free") -> str:
     return create_access_token({
         "sub": str(user.id),
         "tenant_id": user.tenant_id,
@@ -212,9 +211,24 @@ def _make_token(user: User) -> str:
     })
 
 
-def _token_response(user: User, is_new_user: bool = False) -> TokenResponse:
+async def _get_effective_plan(user: User, db: AsyncSession) -> str:
+    """Look up the tenant's active subscription and return 'pro', 'elite', or 'free'."""
+    try:
+        result = await db.execute(
+            select(Subscription).where(Subscription.tenant_id == user.tenant_id)
+        )
+        sub = result.scalar_one_or_none()
+        if sub and sub.is_active:
+            return sub.plan_type or "pro"
+    except Exception:
+        pass
+    return "free"
+
+
+async def _token_response(user: User, db: AsyncSession, is_new_user: bool = False) -> TokenResponse:
+    plan = await _get_effective_plan(user, db)
     return TokenResponse(
-        access_token=_make_token(user),
+        access_token=_make_token(user, plan),
         user_id=user.id,
         name=user.display_name,
         tenant_id=user.tenant_id,
@@ -298,7 +312,7 @@ async def sms_login(body: PhoneLoginRequest, db: AsyncSession = Depends(get_db))
         await track_event("user_logged_in", user, db,
                           properties={"method": "phone", "is_returning": True})
 
-    return _token_response(user, is_new_user=is_new)
+    return await _token_response(user, db, is_new_user=is_new)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -363,7 +377,7 @@ async def wechat_qrcode_status(session_key: str, db: AsyncSession = Depends(get_
         if user:
             return WechatQrcodeStatusResponse(
                 status="confirmed",
-                token_response=_token_response(user),
+                token_response=await _token_response(user, db),
             )
 
     return WechatQrcodeStatusResponse(status="expired")
@@ -411,7 +425,7 @@ async def wechat_callback(body: WechatCallbackRequest, db: AsyncSession = Depend
     if is_new:
         await track_event("user_registered", user, db, properties={"method": "wechat"})
 
-    return _token_response(user, is_new_user=is_new)
+    return await _token_response(user, db, is_new_user=is_new)
 
 
 async def _wechat_code_to_user_info(code: str, settings) -> dict:
@@ -480,7 +494,7 @@ async def register(body: EmailRegisterRequest, db: AsyncSession = Depends(get_db
     await track_event("user_registered", user, db,
                       properties={"method": "email", "company_name": company_name})
 
-    return _token_response(user, is_new_user=True)
+    return await _token_response(user, db, is_new_user=True)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -495,7 +509,7 @@ async def login(body: EmailLoginRequest, db: AsyncSession = Depends(get_db)):
     user.last_login_source = "email"
     await db.commit()
 
-    return _token_response(user)
+    return await _token_response(user, db)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -552,7 +566,7 @@ async def crm_sso(sso_token: str, db: AsyncSession = Depends(get_db)):
     user.last_login_source = "crm_sso"
     await db.commit()
 
-    return _token_response(user, is_new_user=is_new)
+    return await _token_response(user, db, is_new_user=is_new)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
