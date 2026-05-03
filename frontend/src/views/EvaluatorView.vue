@@ -22,7 +22,80 @@
         <p class="ev-hero-desc">选择一位评委，练习如何应对评标现场的刁钻问题</p>
       </div>
 
-      <!-- Task picker -->
+      <!-- Mode tabs -->
+      <div class="mode-tabs">
+        <button class="mode-tab" :class="{ active: selectMode === 'persona' }" @click="selectMode = 'persona'">
+          👤 自选评委
+        </button>
+        <button class="mode-tab" :class="{ active: selectMode === 'scenario' }" @click="selectMode = 'scenario'; loadScenarios()">
+          🎯 场景练习
+        </button>
+      </div>
+
+      <!-- Scenario mode -->
+      <div v-if="selectMode === 'scenario'" class="scenario-mode">
+        <!-- Industry filter -->
+        <div class="scenario-filters">
+          <button v-for="ind in industries" :key="ind.id"
+                  class="ind-pill" :class="{ active: selectedIndustry === ind.id }"
+                  @click="selectedIndustry = selectedIndustry === ind.id ? null : ind.id; filterScenarios()">
+            {{ ind.name }} ({{ ind.scenario_count }})
+          </button>
+          <button class="ind-pill" :class="{ active: selectedIndustry === null }"
+                  @click="selectedIndustry = null; filterScenarios()">全部</button>
+        </div>
+
+        <!-- Scenario grid -->
+        <div v-if="loadingScenarios" class="scenarios-loading">加载中…</div>
+        <div v-else class="scenario-grid">
+          <div v-for="sc in filteredScenarios" :key="sc.id"
+               class="scenario-card"
+               :class="{ selected: selectedScenarioId === sc.id }"
+               @click="selectedScenarioId = sc.id; selectedScenarioDifficulty = sc.difficulty">
+            <div class="sc-header">
+              <span class="sc-industry">{{ industryName(sc.industry) }}</span>
+              <div class="sc-difficulty">
+                <span v-for="n in 5" :key="n" class="sc-dot" :class="{ filled: n <= sc.difficulty }"></span>
+              </div>
+            </div>
+            <div class="sc-name">{{ sc.name }}</div>
+            <div class="sc-customer">{{ sc.customer_type }} · {{ sc.duration_min }}分钟</div>
+            <div class="sc-desc">{{ sc.description }}</div>
+            <div class="sc-tags">
+              <span v-for="tag in sc.tags.slice(0, 3)" :key="tag" class="sc-tag">{{ tag }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scenario evaluator + difficulty picker -->
+        <div v-if="selectedScenarioId" class="scenario-config">
+          <div class="sc-config-row">
+            <div class="sc-config-item">
+              <label>选择评委类型</label>
+              <select v-model="selectedPersonaId" class="picker-select">
+                <option v-for="p in personas" :key="p.id" :value="p.id">
+                  {{ p.avatar_emoji }} {{ p.name }} ({{ p.role }})
+                </option>
+              </select>
+            </div>
+            <div class="sc-config-item">
+              <label>难度级别</label>
+              <select v-model="selectedScenarioDifficulty" class="picker-select">
+                <option :value="1">1 - 入门</option>
+                <option :value="2">2 - 基础</option>
+                <option :value="3">3 - 进阶</option>
+                <option :value="4">4 - 挑战</option>
+                <option :value="5">5 - 专家</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn-start" :disabled="!selectedPersonaId || starting || !selectedTaskId" @click="startScenarioSession">
+            {{ starting ? '准备场景问题…' : '开始场景练习' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Task picker (always visible) -->
       <div class="task-picker-wrap">
         <label class="picker-label">选择述标项目</label>
         <select class="picker-select" v-model="selectedTaskId">
@@ -33,8 +106,8 @@
         </select>
       </div>
 
-      <!-- Persona cards -->
-      <div class="persona-grid">
+      <!-- Persona cards (persona mode only) -->
+      <div v-if="selectMode === 'persona'" class="persona-grid">
         <div
           v-for="persona in personas"
           :key="persona.id"
@@ -65,7 +138,7 @@
         </div>
       </div>
 
-      <div class="ev-start-bar">
+      <div v-if="selectMode === 'persona'" class="ev-start-bar">
         <button
           class="btn-start"
           :disabled="!selectedPersonaId || !selectedTaskId || starting"
@@ -208,6 +281,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { evaluatorsApi, type EvaluatorPersona, type QASession } from '@/api/evaluators'
 import { pitchTaskApi, type PitchTask } from '@/api/pitchTask'
+import { scenariosApi, type ScenarioSummary, type Industry } from '@/api/scenarios'
 
 const route = useRoute()
 const router = useRouter()
@@ -224,6 +298,66 @@ const submitting = ref(false)
 const thinking = ref(false)
 const userInput = ref('')
 const messagesEl = ref<HTMLElement | null>(null)
+
+// Scenario mode state
+const selectMode = ref<'persona' | 'scenario'>('persona')
+const industries = ref<Industry[]>([])
+const allScenarios = ref<ScenarioSummary[]>([])
+const filteredScenarios = ref<ScenarioSummary[]>([])
+const selectedIndustry = ref<string | null>(null)
+const selectedScenarioId = ref<string | null>(null)
+const selectedScenarioDifficulty = ref<number>(3)
+const loadingScenarios = ref(false)
+
+async function loadScenarios() {
+  if (allScenarios.value.length > 0) return  // cached
+  loadingScenarios.value = true
+  try {
+    const [scenRes, indRes] = await Promise.allSettled([
+      scenariosApi.list(),
+      scenariosApi.industries(),
+    ])
+    if (scenRes.status === 'fulfilled') {
+      allScenarios.value = scenRes.value.data
+      filteredScenarios.value = scenRes.value.data
+    }
+    if (indRes.status === 'fulfilled') industries.value = indRes.value.data
+  } finally {
+    loadingScenarios.value = false
+  }
+}
+
+function filterScenarios() {
+  filteredScenarios.value = selectedIndustry.value
+    ? allScenarios.value.filter(s => s.industry === selectedIndustry.value)
+    : allScenarios.value
+}
+
+async function startScenarioSession() {
+  if (!selectedScenarioId.value || !selectedPersonaId.value || !selectedTaskId.value) return
+  starting.value = true
+  try {
+    const res = await scenariosApi.start(selectedScenarioId.value, {
+      task_id: selectedTaskId.value!,
+      persona_id: String(selectedPersonaId.value),
+      difficulty: selectedScenarioDifficulty.value,
+    })
+    // Convert to QASession-like structure for chat phase
+    const sessionId = res.data.session_id
+    const sessionRes = await evaluatorsApi.getSession(sessionId)
+    currentSession.value = sessionRes.data
+    phase.value = 'chat'
+    ElMessage.success(res.data.message)
+  } catch (e: any) {
+    ElMessage.error(e.response?.data?.detail || '启动场景失败，请重试')
+  } finally {
+    starting.value = false
+  }
+}
+
+function industryName(id: string): string {
+  return { system_integration: '系统集成', software_dev: '软件开发', automation: '非标自动化', general: '通用能力' }[id] ?? id
+}
 
 const currentPersona = computed(() =>
   personas.value.find(p => String(p.id) === String(selectedPersonaId.value)) ?? null
@@ -422,6 +556,59 @@ function formatDate(iso: string) {
 .btn-start:hover:not(:disabled) { background: #4F46E5; }
 .btn-start:disabled { opacity: 0.6; cursor: not-allowed; }
 .start-hint { font-size: 12.5px; color: var(--t-muted, #8B8D99); }
+
+/* ── Mode tabs ── */
+.mode-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+.mode-tab {
+  padding: 8px 20px; border-radius: 8px; border: 1px solid #e5e7eb;
+  background: #fff; cursor: pointer; font-size: 13px; font-weight: 600;
+  color: #6b7280; transition: all .15s;
+}
+.mode-tab.active { background: #6366F1; color: #fff; border-color: #6366F1; }
+
+/* ── Scenario mode ── */
+.scenario-mode { }
+.scenario-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.ind-pill {
+  padding: 5px 14px; border-radius: 20px; border: 1px solid #e5e7eb;
+  background: #fff; cursor: pointer; font-size: 12px; color: #6b7280;
+  transition: all .15s;
+}
+.ind-pill.active { background: #6366F1; color: #fff; border-color: #6366F1; }
+.scenarios-loading { text-align: center; padding: 40px; color: #9ca3af; }
+
+.scenario-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px;
+}
+@media (max-width: 900px) { .scenario-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .scenario-grid { grid-template-columns: 1fr; } }
+
+.scenario-card {
+  border: 1.5px solid #e5e7eb; border-radius: 10px; padding: 14px;
+  cursor: pointer; transition: all .15s; background: #fff;
+}
+.scenario-card:hover { border-color: #6366F1; box-shadow: 0 2px 8px rgba(99,102,241,.1); }
+.scenario-card.selected { border-color: #6366F1; background: #eef2ff; }
+.sc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.sc-industry {
+  font-size: 10px; font-weight: 700; color: #6366F1; background: #eef2ff;
+  padding: 2px 8px; border-radius: 4px;
+}
+.sc-difficulty { display: flex; gap: 2px; }
+.sc-dot { width: 7px; height: 7px; border-radius: 50%; background: #e5e7eb; }
+.sc-dot.filled { background: #6366F1; }
+.sc-name { font-size: 14px; font-weight: 700; color: #111827; margin-bottom: 2px; }
+.sc-customer { font-size: 12px; color: #9ca3af; margin-bottom: 6px; }
+.sc-desc { font-size: 12px; color: #6b7280; line-height: 1.5; margin-bottom: 8px; }
+.sc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.sc-tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: #f3f4f6; color: #374151; }
+
+.scenario-config {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px; margin-top: 4px;
+}
+.sc-config-row { display: flex; gap: 16px; margin-bottom: 14px; }
+.sc-config-item { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.sc-config-item label { font-size: 12px; color: #6b7280; }
 
 /* Past sessions */
 .past-sessions { }

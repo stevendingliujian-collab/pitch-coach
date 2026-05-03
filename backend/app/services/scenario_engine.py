@@ -1,0 +1,1183 @@
+"""
+F8 动态场景引擎 — 30+ 预建行业场景 + 自适应难度
+
+场景库按行业分类：
+- 系统集成（IT基础设施、安防、楼宇自动化等）
+- 软件开发（业务系统、移动应用、数据平台等）
+- 非标自动化（工业机器人、产线改造、智能仓储等）
+- 通用能力（演讲表达、问答应对、时间控制等）
+
+每个场景包含：
+- 场景描述、客户背景、关键挑战
+- 必答要点 checklist
+- 评委关注高频问题
+- 难度评级
+- 适用评委类型
+"""
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from app.services.llm_adapter import call_llm
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 30+ Preset Scenarios
+# ═══════════════════════════════════════════════════════════════════════════════
+
+PRESET_SCENARIOS: list[dict] = [
+
+    # ── 系统集成行业（10个）──────────────────────────────────────────────────
+    {
+        "id": "si_gov_erp",
+        "industry": "system_integration",
+        "name": "政务一体化 ERP 系统集成",
+        "customer_type": "政府机关",
+        "difficulty": 3,
+        "duration_min": 20,
+        "description": "为某市级政府部门提供财政、人事、资产三合一 ERP 系统集成项目",
+        "background": "该政府部门现有3套独立系统，数据孤岛严重，年底国家推进政务数字化要求统一集成",
+        "key_challenges": [
+            "历史数据迁移（10年财务数据+5万+人员档案）",
+            "等保三级合规认证",
+            "与上级系统互联互通",
+            "业务不中断上线"
+        ],
+        "checklist": [
+            "整体集成架构方案（数据总线 vs 直连）",
+            "数据迁移策略和演练计划",
+            "等保三级建设方案",
+            "上线期间双轨并行运行方案",
+            "项目里程碑和验收标准"
+        ],
+        "common_questions": [
+            "历史财务数据如何保证不丢失、不失真？",
+            "等保三级评测需要多长时间？你们有没有类似项目经验？",
+            "上线期间如果新系统出问题，老系统还能用吗？",
+            "与省级财政系统的接口标准是什么？",
+            "你们的驻场服务团队规模是多少人？"
+        ],
+        "evaluator_types": ["tech", "user", "compliance"],
+        "tags": ["政府", "ERP", "系统集成", "等保"]
+    },
+    {
+        "id": "si_hospital_his",
+        "industry": "system_integration",
+        "name": "三甲医院 HIS 系统升级改造",
+        "customer_type": "医疗机构",
+        "difficulty": 5,
+        "duration_min": 25,
+        "description": "为三甲医院提供新一代 HIS（医院信息系统）升级及院内各子系统集成",
+        "background": "医院现有 HIS 系统已运行12年，无法支撑日均5000门诊量，急需升级",
+        "key_challenges": [
+            "7×24不停机迁移（手术室、ICU不能中断）",
+            "与 LIS、PACS、HRP、电子病历等12个子系统集成",
+            "医疗数据安全合规（等保四级）",
+            "医生操作习惯改变的阻力"
+        ],
+        "checklist": [
+            "分阶段割接方案（先门诊、后住院）",
+            "12个子系统接口改造清单和工作量",
+            "医疗数据备份和容灾方案",
+            "医护人员培训计划",
+            "紧急回退方案"
+        ],
+        "common_questions": [
+            "手术室在用状态下如何做系统迁移？",
+            "你们做过多少家三甲医院项目？成功率如何？",
+            "如果新系统崩溃，多久能切回老系统？",
+            "医生最抵触的改变是什么，你们怎么应对？",
+            "数据备份方案是实时还是定期？"
+        ],
+        "evaluator_types": ["tech", "user", "compliance", "executive"],
+        "tags": ["医疗", "HIS", "系统集成", "高风险"]
+    },
+    {
+        "id": "si_campus_safe",
+        "industry": "system_integration",
+        "name": "智慧校园安防一体化平台",
+        "customer_type": "高等院校",
+        "difficulty": 2,
+        "duration_min": 15,
+        "description": "为某高校提供视频监控、门禁、消防、停车一体化安防平台",
+        "background": "学校现有5个独立安防系统，联动差，发生事件时响应慢，教育部安全检查不通过",
+        "key_challenges": [
+            "5套异厂家系统统一接入",
+            "人脸识别数据合规（PIPL）",
+            "跨楼栋、跨校区部署",
+            "学生隐私保护"
+        ],
+        "checklist": [
+            "各子系统接入协议兼容性",
+            "统一管理平台功能演示",
+            "人脸数据存储和合规处理方案",
+            "校园网络改造需求",
+            "售后响应时间承诺"
+        ],
+        "common_questions": [
+            "人脸识别数据存在哪里？谁能看到？",
+            "现有摄像头需要全换还是可以复用？",
+            "全校3000个摄像头点位，多久能完成布线？",
+            "与公安系统的联动接口有没有做过？",
+            "系统出故障时的备用方案是什么？"
+        ],
+        "evaluator_types": ["tech", "user", "compliance"],
+        "tags": ["教育", "安防", "智慧校园"]
+    },
+    {
+        "id": "si_factory_mes",
+        "industry": "system_integration",
+        "name": "制造业 MES 智能工厂集成",
+        "customer_type": "制造企业",
+        "difficulty": 4,
+        "duration_min": 20,
+        "description": "为大型制造企业提供 MES 系统实施及与 ERP、SCADA、WMS 的集成",
+        "background": "企业推进工业4.0转型，现有系统与产线设备无法互联，产能利用率仅65%",
+        "key_challenges": [
+            "100+ 台不同年代 PLC 设备接入",
+            "MES 与 SAP ERP 深度集成",
+            "产线不停机改造",
+            "工厂老员工信息化抵触情绪"
+        ],
+        "checklist": [
+            "PLC 数采方案（OPC-UA、Modbus 等协议）",
+            "MES-ERP 集成数据流图",
+            "分阶段上线计划（产线分批改造）",
+            "KPI 提升目标（OEE、良率等）",
+            "员工培训和变革管理"
+        ],
+        "common_questions": [
+            "PLC 型号这么多，接入兼容性如何保证？",
+            "SAP 接口改造会影响现有 ERP 使用吗？",
+            "产能利用率从65%提到多少？有量化承诺吗？",
+            "如果产线工人操作失误，系统有没有防错机制？",
+            "类似规模的项目你们做过吗？交付周期多久？"
+        ],
+        "evaluator_types": ["tech", "user", "executive"],
+        "tags": ["制造", "MES", "工业4.0", "系统集成"]
+    },
+    {
+        "id": "si_bank_security",
+        "industry": "system_integration",
+        "name": "银行网络安全态势感知平台",
+        "customer_type": "金融机构",
+        "difficulty": 5,
+        "duration_min": 25,
+        "description": "为某商业银行提供基于 AI 的全行网络安全态势感知平台建设",
+        "background": "银行近2年遭受多次针对性攻击，监管要求限时整改，安全预算1500万",
+        "key_challenges": [
+            "7×24实时监测海量安全日志",
+            "AI 误报率控制在5%以内",
+            "金融行业等保四级要求",
+            "与现有 SIEM 系统平滑替换"
+        ],
+        "checklist": [
+            "威胁检测准确率指标（检出率、误报率）",
+            "AI 模型训练数据来源和迭代机制",
+            "与现有安全设备的联动编排",
+            "等保四级合规方案",
+            "金融行业成功案例"
+        ],
+        "common_questions": [
+            "你们的 AI 模型误报率有数据支撑吗？",
+            "银行的网络安全日志每天数十亿条，如何实时处理？",
+            "如果态势感知平台本身被攻击怎么办？",
+            "你们的安全研究团队规模多大？",
+            "央行监管要求的合规报告能自动生成吗？"
+        ],
+        "evaluator_types": ["tech", "compliance", "executive"],
+        "tags": ["金融", "安全", "AI", "等保四级"]
+    },
+    {
+        "id": "si_logistics_wms",
+        "industry": "system_integration",
+        "name": "智慧物流仓储管理系统",
+        "customer_type": "物流企业",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "为某电商物流企业提供 WMS + 自动化分拣设备集成解决方案",
+        "background": "双十一期间系统崩溃，日处理包裹从50万降至20万，损失惨重，急需升级",
+        "key_challenges": [
+            "旺季日均100万包裹并发处理",
+            "与天猫、京东、拼多多三大平台 API 对接",
+            "自动化输送带和分拣机控制系统集成",
+            "旺季不停业升级"
+        ],
+        "checklist": [
+            "系统峰值并发处理能力（TPS）",
+            "三大电商平台 API 对接方案",
+            "硬件控制系统集成协议",
+            "分阶段割接方案",
+            "压力测试报告"
+        ],
+        "common_questions": [
+            "双十一峰值，你们能保证100万包裹/天不崩溃吗？",
+            "天猫和京东的 API 版本经常变，如何维护？",
+            "输送带控制和 WMS 的时序同步如何保证？",
+            "系统升级期间出错，哪些环节可以人工兜底？",
+            "你们的 SLA 承诺是多少个9？"
+        ],
+        "evaluator_types": ["tech", "user", "executive"],
+        "tags": ["物流", "WMS", "电商", "高并发"]
+    },
+    {
+        "id": "si_energy_scada",
+        "industry": "system_integration",
+        "name": "能源企业 SCADA 工控系统集成",
+        "customer_type": "能源企业",
+        "difficulty": 5,
+        "duration_min": 25,
+        "description": "为某省级电力公司提供新一代 SCADA 系统及调度自动化改造",
+        "background": "现有 SCADA 系统运行15年，无法满足新能源接入要求，国家电网合规检查即将到来",
+        "key_challenges": [
+            "不停电改造（安全关键系统）",
+            "新能源（光伏、风电）实时接入",
+            "工控安全（工业信息安全2.0）",
+            "与电力调度主站系统对接"
+        ],
+        "checklist": [
+            "不停电迁移技术方案",
+            "新能源接入容量和响应时间指标",
+            "工控安全防护体系",
+            "电力行业资质（承装修试五级及以上）",
+            "72小时连续运行稳定性测试方案"
+        ],
+        "common_questions": [
+            "系统切换时如何保证不中断供电？",
+            "最多可以接入多少新能源场站？",
+            "工控系统被攻击有什么防护机制？",
+            "你们的电力行业承装修试资质等级是几级？",
+            "如果改造后发现问题，应急回退需要多长时间？"
+        ],
+        "evaluator_types": ["tech", "compliance", "executive"],
+        "tags": ["能源", "SCADA", "工控安全", "高风险"]
+    },
+    {
+        "id": "si_retail_pos",
+        "industry": "system_integration",
+        "name": "连锁零售全渠道数字化改造",
+        "customer_type": "零售企业",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "为300家连锁便利店提供线上线下全渠道统一 POS 和会员系统改造",
+        "background": "线上APP和线下POS数据不同步，会员积分无法通用，影响复购率",
+        "key_challenges": [
+            "300家门店同步改造，保证营业不中断",
+            "线上线下库存实时同步",
+            "微信/支付宝/银联三方支付集成",
+            "历史会员数据清洗合并"
+        ],
+        "checklist": [
+            "分批次门店改造计划",
+            "库存同步延迟指标（<3秒）",
+            "三方支付接入方案和资质",
+            "会员数据迁移清洗方案",
+            "门店店员培训计划"
+        ],
+        "common_questions": [
+            "300家门店同时改造，你们有足够的实施人员吗？",
+            "旺季（春节、双十一）期间能否开工？",
+            "库存数据不同步会导致超卖，有什么容错机制？",
+            "支付接口如果出问题，店铺能否手动应急？",
+            "改造期间门店数据安全怎么保障？"
+        ],
+        "evaluator_types": ["tech", "user", "business"],
+        "tags": ["零售", "全渠道", "POS", "连锁"]
+    },
+    {
+        "id": "si_smart_city",
+        "industry": "system_integration",
+        "name": "智慧城市综合管理平台",
+        "customer_type": "地方政府",
+        "difficulty": 4,
+        "duration_min": 20,
+        "description": "为某地级市建设城市大脑，整合交通、环保、应急、社区治理四大领域",
+        "background": "市委推进数字政府建设，需要打通12个委办局数据，预算8000万",
+        "key_challenges": [
+            "12个委办局系统数据互联互通",
+            "城市级大数据平台建设",
+            "AI 分析决策辅助系统",
+            "数据安全和隐私合规"
+        ],
+        "checklist": [
+            "数据治理方案（数据标准、质量、目录）",
+            "城市大数据平台架构",
+            "AI 应用场景和效果量化指标",
+            "跨部门数据共享合规机制",
+            "典型城市案例"
+        ],
+        "common_questions": [
+            "12个委办局配合度不一，如何推动数据共享？",
+            "城市大脑的 AI 辅助决策准确率是多少？",
+            "市民数据如何保障隐私？谁能访问？",
+            "8000万预算，如何分阶段交付，每期产出什么？",
+            "类似规模的智慧城市你们做过哪些？"
+        ],
+        "evaluator_types": ["tech", "compliance", "executive"],
+        "tags": ["政府", "智慧城市", "大数据", "AI"]
+    },
+    {
+        "id": "si_telecom_bss",
+        "industry": "system_integration",
+        "name": "运营商 BSS/OSS 系统升级",
+        "customer_type": "电信运营商",
+        "difficulty": 5,
+        "duration_min": 30,
+        "description": "为某省级运营商提供计费结算系统（BSS）和网络管理系统（OSS）升级",
+        "background": "5G商用导致计费模型和网络拓扑剧变，现有系统无法支撑，日处理话单20亿条",
+        "key_challenges": [
+            "7×24不停机迁移（影响5000万用户）",
+            "日处理20亿条话单，峰值处理能力",
+            "新旧系统双轨并行期间的数据一致性",
+            "运营商级高可用（99.999%）"
+        ],
+        "checklist": [
+            "系统容量规划（日均20亿+峰值50亿话单）",
+            "双轨并行数据一致性方案",
+            "灰度切换方案（按省份/地市分批）",
+            "容灾备份和RTO/RPO指标",
+            "在运营商成功案例"
+        ],
+        "common_questions": [
+            "日均20亿条话单，系统架构如何设计？",
+            "双轨并行期间两套系统出现数据差异怎么处理？",
+            "灰度切换如果发现问题，回滚需要多久？",
+            "99.999%可用性如何实现？异地多活方案是什么？",
+            "如果全省用户无法打电话，赔偿条款是什么？"
+        ],
+        "evaluator_types": ["tech", "business", "executive"],
+        "tags": ["电信", "BSS", "OSS", "5G", "超高可用"]
+    },
+
+    # ── 软件开发行业（10个）──────────────────────────────────────────────────
+    {
+        "id": "sw_crm_saas",
+        "industry": "software_dev",
+        "name": "企业级 CRM SaaS 平台开发",
+        "customer_type": "销售型企业",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "为某大型销售公司定制开发 CRM 系统，3000人销售团队使用",
+        "background": "现有系统是10年前的老旧平台，移动端体验差，销售经理反映数据不准确",
+        "key_challenges": [
+            "3000人并发，移动端响应速度",
+            "与ERP、呼叫中心、飞书等集成",
+            "销售流程可配置（不同产品线不同流程）",
+            "数据安全（销售数据不能泄露给竞品）"
+        ],
+        "checklist": [
+            "移动端性能指标（<2秒响应）",
+            "与飞书/ERP/呼叫中心集成方案",
+            "工作流引擎（可视化配置销售流程）",
+            "数据权限控制方案（销售只看自己客户）",
+            "历史数据迁移方案"
+        ],
+        "common_questions": [
+            "3000人同时用，移动端会卡顿吗？",
+            "销售流程很复杂，能不能不改代码就配置？",
+            "数据权限怎么保证销售A看不到销售B的客户？",
+            "与飞书的集成程度如何？能在飞书里操作CRM吗？",
+            "合同和商机数据发生变更有没有完整的审计日志？"
+        ],
+        "evaluator_types": ["tech", "user", "business"],
+        "tags": ["软件开发", "CRM", "SaaS", "销售管理"]
+    },
+    {
+        "id": "sw_gov_app",
+        "industry": "software_dev",
+        "name": "政务服务小程序开发",
+        "customer_type": "政府机构",
+        "difficulty": 2,
+        "duration_min": 15,
+        "description": "为某区政务服务中心开发「一网通办」微信小程序，整合200+项政务服务",
+        "background": "市民反映跑腿次数多、材料复杂，上级要求「最多跑一次」改革落地",
+        "key_challenges": [
+            "200+ 项服务的标准化和在线化",
+            "与政务办件系统、电子签章系统对接",
+            "实名认证（身份证 OCR + 人脸识别）",
+            "无障碍设计（老年人友好）"
+        ],
+        "checklist": [
+            "200+ 服务上线计划（分批次）",
+            "电子签章和实名认证技术方案",
+            "无障碍设计功能清单",
+            "办件系统接口改造工作量",
+            "用户测试和验收标准"
+        ],
+        "common_questions": [
+            "200项服务，有没有能力在6个月内全部上线？",
+            "老年人不会用小程序，有什么帮扶方案？",
+            "人脸识别数据存在哪里？谁能调用？",
+            "如果后台审批人员不配合，怎么推动改变工作流？",
+            "小程序崩溃时，市民的办件数据会丢失吗？"
+        ],
+        "evaluator_types": ["tech", "user", "compliance"],
+        "tags": ["政府", "小程序", "政务服务", "无障碍"]
+    },
+    {
+        "id": "sw_fintech_payment",
+        "industry": "software_dev",
+        "name": "金融科技支付平台开发",
+        "customer_type": "金融机构",
+        "difficulty": 5,
+        "duration_min": 25,
+        "description": "为某消费金融公司开发全新的支付结算平台，支持对接银行、第三方支付及清算机构",
+        "background": "现有第三方支付手续费过高（每笔0.6%），计划自建支付通道，年交易额30亿",
+        "key_challenges": [
+            "支付安全（PCI-DSS 合规）",
+            "7×24高可用（不能停机）",
+            "多清算机构路由优化",
+            "央行支付牌照合规要求"
+        ],
+        "checklist": [
+            "PCI-DSS 认证计划和时间线",
+            "系统高可用架构（异地双活）",
+            "多通道智能路由策略",
+            "账务对账和差错处理流程",
+            "压力测试：TPS > 5000"
+        ],
+        "common_questions": [
+            "你们的支付系统有没有 PCI-DSS 认证？",
+            "万一系统故障，正在进行的支付交易怎么处理？",
+            "多通道路由的策略是按费率还是按成功率？",
+            "账务系统如何保证与清算机构数据完全一致？",
+            "如果资金清算出现差错，赔偿机制是什么？"
+        ],
+        "evaluator_types": ["tech", "compliance", "executive"],
+        "tags": ["金融", "支付", "高可用", "合规"]
+    },
+    {
+        "id": "sw_education_platform",
+        "industry": "software_dev",
+        "name": "在线教育直播互动平台开发",
+        "customer_type": "教育机构",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "为某K12教育机构开发新一代在线直播课堂平台，支持10万学生同时在线",
+        "background": "疫情后在线教育常态化，现有平台延迟高（>500ms），掉线率高，家长投诉多",
+        "key_challenges": [
+            "10万并发，低延迟（<100ms）",
+            "弱网环境下（学生在农村）的稳定性",
+            "互动功能（举手、连麦、白板）",
+            "未成年人保护和防沉迷"
+        ],
+        "checklist": [
+            "音视频延迟指标（<100ms）",
+            "弱网自适应码率方案",
+            "未成年人上网保护合规方案",
+            "互动功能技术方案",
+            "CDN 节点覆盖和带宽承诺"
+        ],
+        "common_questions": [
+            "10万人同时在线，延迟能保证低于100ms吗？",
+            "学生在农村，4G信号差，如何保证不卡顿？",
+            "教育部要求防沉迷，你们的方案是什么？",
+            "老师和学生互动（连麦、举手），延迟多少？",
+            "平台崩溃时，学生正在上的课怎么处理？"
+        ],
+        "evaluator_types": ["tech", "user", "compliance"],
+        "tags": ["教育", "音视频", "直播", "并发"]
+    },
+    {
+        "id": "sw_healthcare_ai",
+        "industry": "software_dev",
+        "name": "AI 辅助医学影像诊断系统",
+        "customer_type": "医疗机构",
+        "difficulty": 5,
+        "duration_min": 25,
+        "description": "为某大型体检机构开发基于 AI 的 CT/MRI 影像辅助诊断系统",
+        "background": "体检机构日处理影像5000份，放射科医生严重不足，漏诊率偏高",
+        "key_challenges": [
+            "AI 诊断准确率（敏感度 > 95%，特异度 > 90%）",
+            "医疗器械二类注册证（NMPA）",
+            "与现有 PACS 系统集成",
+            "医生辅助而非替代的产品定位"
+        ],
+        "checklist": [
+            "AI 模型准确率指标（第三方测评数据）",
+            "NMPA 医疗器械注册状态",
+            "PACS 系统集成技术方案",
+            "医生工作流融合设计（不增加操作步骤）",
+            "模型持续迭代和优化机制"
+        ],
+        "common_questions": [
+            "AI 漏诊了怎么办？责任由谁承担？",
+            "你们的 NMPA 二类器械注册证有没有？",
+            "准确率数据是自测还是第三方医院测评？",
+            "如果 AI 诊断结果和医生意见相反，如何处理？",
+            "模型在不同设备（不同厂家CT机）上表现一致吗？"
+        ],
+        "evaluator_types": ["tech", "user", "compliance", "executive"],
+        "tags": ["医疗", "AI", "医学影像", "NMPA"]
+    },
+    {
+        "id": "sw_supply_chain",
+        "industry": "software_dev",
+        "name": "供应链协同管理平台",
+        "customer_type": "制造企业",
+        "difficulty": 4,
+        "duration_min": 20,
+        "description": "为某汽车零部件制造商开发供应链协同平台，连接500家供应商",
+        "background": "供应商管理依靠Excel和微信，交货延迟率高达18%，影响整车厂JIT计划",
+        "key_challenges": [
+            "500家供应商快速接入（小供应商不懂技术）",
+            "与主机厂 SAP ERP 深度集成",
+            "零部件追溯（一车一码）",
+            "供应商数据安全隔离"
+        ],
+        "checklist": [
+            "供应商快速接入方案（无代码/低代码）",
+            "SAP 集成接口规范",
+            "零部件二维码追溯方案",
+            "供应商数据权限隔离设计",
+            "交货延迟预警和处置流程"
+        ],
+        "common_questions": [
+            "小供应商只有3个人，如何让他们用你们的系统？",
+            "与SAP集成，有没有影响SAP正常运行的风险？",
+            "零部件追溯数据如果被篡改，如何检测？",
+            "500家供应商数据相互隔离，如何设计权限？",
+            "交货延迟预警准确率如何？有没有假阳性问题？"
+        ],
+        "evaluator_types": ["tech", "user", "business"],
+        "tags": ["制造", "供应链", "SAP", "协同"]
+    },
+    {
+        "id": "sw_hr_saas",
+        "industry": "software_dev",
+        "name": "企业 HR 数字化平台",
+        "customer_type": "大型企业",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "为某集团企业（30000员工）开发统一 HR 平台，覆盖招聘、薪酬、绩效、培训",
+        "background": "集团30家子公司各用不同HR系统，无法统一报表，年度劳动合规检查有隐患",
+        "key_challenges": [
+            "30家子公司差异化需求的统一化",
+            "薪酬计算（涉及20种薪酬结构）",
+            "劳动合规（不同城市劳动法差异）",
+            "个人数据隐私保护"
+        ],
+        "checklist": [
+            "多法人架构支持（一套系统管30家子公司）",
+            "薪酬引擎可配置性（20种结构）",
+            "各城市社保公积金自动计算",
+            "员工个人数据 PIPL 合规方案",
+            "数据迁移（30家子公司历史数据）"
+        ],
+        "common_questions": [
+            "30家子公司，每家HR需求不同，如何兼顾？",
+            "薪酬计算出错，涉及3万人工资，责任如何划分？",
+            "不同城市社保规则经常变，如何及时更新？",
+            "员工能在系统里看到自己工资明细吗？数据谁负责保护？",
+            "数据迁移期间如果薪酬数据丢失怎么办？"
+        ],
+        "evaluator_types": ["tech", "user", "compliance"],
+        "tags": ["软件开发", "HR", "SaaS", "集团管理"]
+    },
+    {
+        "id": "sw_data_platform",
+        "industry": "software_dev",
+        "name": "企业数据中台建设",
+        "customer_type": "大型企业",
+        "difficulty": 4,
+        "duration_min": 20,
+        "description": "为某零售集团建设统一数据中台，整合全渠道20TB数据资产",
+        "background": "集团有50+数据系统，分析师取数需等待2-3天，高层决策缺乏数据支撑",
+        "key_challenges": [
+            "50+源系统数据治理和标准化",
+            "20TB存量数据迁移",
+            "分析师自助取数（降低IT依赖）",
+            "数据质量保障机制"
+        ],
+        "checklist": [
+            "数据架构（ODS/DWD/DWS/ADS 分层设计）",
+            "数据目录和血缘关系",
+            "分析师自助取数工具选型",
+            "数据质量监控和告警",
+            "数据安全和行列级权限控制"
+        ],
+        "common_questions": [
+            "50个源系统的数据标准不统一，如何协调50个业务部门？",
+            "取数从2-3天降到多久？有量化承诺吗？",
+            "20TB数据迁移期间业务能否正常运行？",
+            "数据质量问题如果影响到高层决策报告怎么处理？",
+            "数据中台上线后，IT团队的工作量会增加还是减少？"
+        ],
+        "evaluator_types": ["tech", "user", "executive"],
+        "tags": ["数据", "数据中台", "大数据", "数据治理"]
+    },
+    {
+        "id": "sw_iot_platform",
+        "industry": "software_dev",
+        "name": "工业物联网管理平台",
+        "customer_type": "制造企业",
+        "difficulty": 4,
+        "duration_min": 20,
+        "description": "为某设备制造商开发 IoT 远程监控平台，管理全国5万台在役设备",
+        "background": "售后维修成本占营收15%，维修工程师出差效率低，计划通过预测性维护降低成本",
+        "key_challenges": [
+            "5万台设备 IoT 接入和管理",
+            "预测性维护 AI 算法准确率",
+            "边缘计算（网络不稳定场景）",
+            "设备数据安全（工业间谍风险）"
+        ],
+        "checklist": [
+            "IoT 接入协议（MQTT/CoAP）和设备管理",
+            "预测性维护模型准确率（提前7天预警）",
+            "边缘端推理能力（离线场景）",
+            "设备数据加密传输方案",
+            "维修成本降低量化目标"
+        ],
+        "common_questions": [
+            "5万台设备同时在线，消息中间件如何选型？",
+            "预测性维护准确率多少？误报了客户怎么处理？",
+            "设备在地下矿山没有网络，如何处理离线状态？",
+            "竞争对手通过IoT数据分析我们产品的弱点怎么防？",
+            "维修成本从15%降到多少？有没有量化的ROI承诺？"
+        ],
+        "evaluator_types": ["tech", "user", "executive"],
+        "tags": ["物联网", "IoT", "预测性维护", "工业"]
+    },
+    {
+        "id": "sw_ai_customer_service",
+        "industry": "software_dev",
+        "name": "AI 智能客服系统",
+        "customer_type": "互联网/零售企业",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "为某电商平台开发基于大模型的 AI 智能客服系统，日均服务100万客户咨询",
+        "background": "客服中心每年人力成本5000万，电话等待时间平均8分钟，客户满意度差",
+        "key_challenges": [
+            "大模型准确率（错误答案会导致客户投诉）",
+            "与电商订单/退款系统实时集成",
+            "热点问题实时更新（大促期间突发问题）",
+            "敏感话题（投诉、维权）的人工转接"
+        ],
+        "checklist": [
+            "AI 首次响应解决率目标（>80%）",
+            "与订单系统实时 API 集成方案",
+            "知识库快速更新机制",
+            "人工转接路由策略",
+            "AI 幻觉防御（拒绝不准确的回答）"
+        ],
+        "common_questions": [
+            "AI 给了错误退款信息，客户投诉了，谁负责？",
+            "大促期间新品问题突发，AI 如何24小时内更新知识库？",
+            "客户在投诉时说「我要找人说」，AI 如何判断并转接？",
+            "首次解决率从目前的45%提到多少？有没有数据支撑？",
+            "大模型幻觉问题如何防止给出完全不相关的答案？"
+        ],
+        "evaluator_types": ["tech", "user", "business"],
+        "tags": ["AI", "客服", "大模型", "NLP"]
+    },
+
+    # ── 非标自动化（5个）────────────────────────────────────────────────────
+    {
+        "id": "auto_assembly_line",
+        "industry": "automation",
+        "name": "汽车零部件自动化装配线改造",
+        "customer_type": "汽车零部件制造商",
+        "difficulty": 4,
+        "duration_min": 20,
+        "description": "将某汽车零部件工厂现有半自动装配线改造为全自动化，产能提升200%",
+        "background": "工厂产能跟不上主机厂扩产要求，人工成本每年涨价8%，质量一致性差",
+        "key_challenges": [
+            "改造期间不停线（主机厂 JIT 交货不能断）",
+            "视觉检测质量标准（漏检率<0.01%）",
+            "多品种柔性生产（8种规格快速切换）",
+            "人机协作安全（ISO 10218）"
+        ],
+        "checklist": [
+            "不停线改造方案（周末施工+节假日联调）",
+            "视觉检测技术方案和精度指标",
+            "柔性切换时间指标（<15分钟）",
+            "安全防护方案和 CE 认证",
+            "产能提升量化目标和验收方案"
+        ],
+        "common_questions": [
+            "改造期间主机厂的零件供货怎么保证？",
+            "8种规格自动切换，换型时间多久？能保证吗？",
+            "视觉检测漏检了，主机厂发现了怎么处理？",
+            "工人要失业吗？有没有再就业安置方案？",
+            "产能从3万件/月提到多少？何时验收？"
+        ],
+        "evaluator_types": ["tech", "user", "executive"],
+        "tags": ["自动化", "汽车", "装配线", "柔性生产"]
+    },
+    {
+        "id": "auto_warehouse_agv",
+        "industry": "automation",
+        "name": "智能仓储 AGV 机器人系统",
+        "customer_type": "电商/制造企业",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "为某电商仓储中心部署300台 AGV 机器人，实现货到人拣选",
+        "background": "仓库人员每天步行25公里，效率低且离职率高，旺季无法扩产",
+        "key_challenges": [
+            "300台 AGV 协同调度（避碰）",
+            "与 WMS 实时集成",
+            "充电管理（不影响全天运营）",
+            "旺季突发扩容能力"
+        ],
+        "checklist": [
+            "AGV 最大并发台数和调度算法",
+            "系统拣选效率指标（件/人时提升）",
+            "WMS 集成 API 规范",
+            "AGV 充电调度策略",
+            "故障 AGV 快速替换方案"
+        ],
+        "common_questions": [
+            "300台 AGV 同时运行，碰撞了怎么处理？",
+            "AGV 故障率多少？坏了对生产线影响多大？",
+            "双十一临时增加100台 AGV，多久可以部署？",
+            "充电时间和工作时间如何平衡？会不会停工等充电？",
+            "工人还需要多少人？节省的人工成本是多少？"
+        ],
+        "evaluator_types": ["tech", "user", "executive"],
+        "tags": ["自动化", "AGV", "仓储", "机器人"]
+    },
+    {
+        "id": "auto_inspection",
+        "industry": "automation",
+        "name": "工业视觉质检系统",
+        "customer_type": "精密制造企业",
+        "difficulty": 4,
+        "duration_min": 20,
+        "description": "为某精密电子制造商部署基于深度学习的 PCB 板视觉质检系统",
+        "background": "人工质检准确率91%，每年因漏检造成客户投诉损失2000万，人工成本高",
+        "key_challenges": [
+            "检测准确率提升（漏检率 < 0.1%）",
+            "产线速度（200块/分钟不能降速）",
+            "小样本缺陷学习（新型缺陷快速识别）",
+            "检测结果与 MES 系统集成"
+        ],
+        "checklist": [
+            "检测准确率和漏检率指标（第三方测评）",
+            "在线检测速度与产线兼容性",
+            "新型缺陷学习周期（数据量和时间）",
+            "MES 集成方案",
+            "误检（良品判废）率控制"
+        ],
+        "common_questions": [
+            "准确率数据是在你们自己数据集上测的还是在我们产线上测？",
+            "新型缺陷出现，要多少张图才能学会？",
+            "误检（把良品判为废品）率控制在多少？",
+            "200块/分钟检测，算力如何规划？",
+            "系统出问题，产线要停多久才能恢复人工检测？"
+        ],
+        "evaluator_types": ["tech", "user", "executive"],
+        "tags": ["自动化", "视觉检测", "AI", "精密制造"]
+    },
+    {
+        "id": "auto_food_packaging",
+        "industry": "automation",
+        "name": "食品饮料自动化包装线",
+        "customer_type": "食品企业",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "为某大型饮料企业建设全自动灌装包装生产线，日产能200万瓶",
+        "background": "现有半自动产线人工污染风险高，食品安全监管越来越严，季节性波动大",
+        "key_challenges": [
+            "食品级洁净设计（无死角清洗）",
+            "季节波动（旺季是淡季的3倍）",
+            "多品种（50种规格）快速换型",
+            "GMP/食品安全法合规"
+        ],
+        "checklist": [
+            "洁净设计和在线 CIP 清洗方案",
+            "柔性生产方案（50种规格快速换型）",
+            "旺季扩产方案（模块化设计）",
+            "GMP/食品安全法合规认证",
+            "设备年综合效率（OEE > 85%）"
+        ],
+        "common_questions": [
+            "洁净设计如何保证无死角，通过食品安全检查？",
+            "50种规格换型，每次换型停机多长时间？",
+            "旺季产能需要翻3倍，设备如何快速扩容？",
+            "CIP 清洗方案消耗水和清洗剂多少？成本如何？",
+            "OEE 承诺85%，如果达不到谁来负责？"
+        ],
+        "evaluator_types": ["tech", "user", "compliance"],
+        "tags": ["自动化", "食品", "包装线", "GMP"]
+    },
+    {
+        "id": "auto_pharma_clean",
+        "industry": "automation",
+        "name": "医药 GMP 洁净车间自动化",
+        "customer_type": "制药企业",
+        "difficulty": 5,
+        "duration_min": 25,
+        "description": "为某生物制药公司建设符合中美 GMP 标准的全自动化生产车间",
+        "background": "企业计划拓展美国市场，需要通过 FDA 认证，现有手工操作不符合 21 CFR Part 11",
+        "key_challenges": [
+            "FDA 21 CFR Part 11 电子记录合规",
+            "万级/十万级洁净室设计建设",
+            "全程可追溯（批次追溯）",
+            "验证文件体系（IQ/OQ/PQ）"
+        ],
+        "checklist": [
+            "21 CFR Part 11 合规方案",
+            "洁净室设计规格（含HVAC系统）",
+            "批次追溯系统和电子批记录",
+            "验证文件体系（IQ/OQ/PQ）",
+            "FDA 审计模拟和历史案例"
+        ],
+        "common_questions": [
+            "你们做过 FDA 审计的案例吗？通过率如何？",
+            "21 CFR Part 11 电子签名，如何防止事后篡改记录？",
+            "万级洁净室建设周期多久？期间现有产线如何运营？",
+            "验证文件体系（IQ/OQ/PQ）谁来写，谁来执行？",
+            "FDA 认证失败，项目损失由谁承担？"
+        ],
+        "evaluator_types": ["tech", "compliance", "executive"],
+        "tags": ["自动化", "医药", "GMP", "FDA", "洁净室"]
+    },
+
+    # ── 通用能力场景（5个）──────────────────────────────────────────────────
+    {
+        "id": "general_time_control",
+        "industry": "general",
+        "name": "述标时间控制专项练习",
+        "customer_type": "通用",
+        "difficulty": 2,
+        "duration_min": 15,
+        "description": "在严格时间限制（15分钟）内完整陈述核心方案，不超时也不结束太早",
+        "background": "评委时间宝贵，超时会被打断，是述标大忌；结束太早显示准备不足",
+        "key_challenges": [
+            "把握整体节奏，每页PPT分配合理时间",
+            "在规定时间内覆盖所有关键信息",
+            "预留3分钟给评委问答",
+            "超时时的临机取舍能力"
+        ],
+        "checklist": [
+            "15分钟内完成主要内容（含开场1分钟，结尾1分钟）",
+            "每个核心模块时间分配合理（不超过模块时间+20%）",
+            "预留问答时间（至少2-3分钟）",
+            "不出现超时被打断的情况"
+        ],
+        "common_questions": [
+            "你只剩2分钟了，还有3张PPT没讲，怎么处理？",
+            "开场白占用了过多时间，如何快速调整节奏？",
+            "评委问了一个很长的问题，回答后时间不够了怎么办？"
+        ],
+        "evaluator_types": ["executive", "user"],
+        "tags": ["时间控制", "通用", "基础能力"]
+    },
+    {
+        "id": "general_tough_qa",
+        "industry": "general",
+        "name": "刁难性问题应对专项练习",
+        "customer_type": "通用",
+        "difficulty": 4,
+        "duration_min": 20,
+        "description": "应对评委的刁难性问题、无理质疑和陷阱问题，保持专业和自信",
+        "background": "述标现场经常出现明显带有预设立场的刁难问题，甚至是竞争对手安排的"托儿"",
+        "key_challenges": [
+            "保持冷静，不被情绪影响",
+            "识别陷阱问题并礼貌化解",
+            "对不确定的问题坦诚而不失专业",
+            "将刁难转化为展示优势的机会"
+        ],
+        "checklist": [
+            "遇到刁难问题保持冷静（无防御性语气）",
+            "给出专业的回应，而不是回避或简单否认",
+            "对不知道的问题诚实表达，而非编造答案",
+            "至少1次将刁难转化为主动阐述优势"
+        ],
+        "common_questions": [
+            "你们公司成立才3年，有能力做这么大的项目吗？",
+            "我听说你们在XX客户那边出过严重事故，是真的吗？",
+            "你们的方案和竞争对手A基本一样，价格还贵30%，凭什么选你？",
+            "这个技术指标你们能达到？我觉得你们在吹牛。",
+            "如果你们项目失败了，倒贴多少钱？"
+        ],
+        "evaluator_types": ["executive", "compliance", "business"],
+        "tags": ["应对技巧", "通用", "高难度问答"]
+    },
+    {
+        "id": "general_cold_open",
+        "industry": "general",
+        "name": "开场白和结构化陈述练习",
+        "customer_type": "通用",
+        "difficulty": 1,
+        "duration_min": 10,
+        "description": "练习如何在3分钟内完成有力的开场白，建立专业第一印象",
+        "background": "开场白是述标的黄金3分钟，决定评委的初始印象和后续注意力",
+        "key_challenges": [
+            "30秒内说清公司核心优势",
+            "展示对客户痛点的理解",
+            "预告陈述结构，帮助评委预期",
+            "语速适中、自信不慌"
+        ],
+        "checklist": [
+            "30秒公司介绍（不超过3个核心能力）",
+            "1分钟客户痛点共鸣",
+            "30秒陈述结构预告",
+            "语速100-130字/分钟"
+        ],
+        "common_questions": [
+            "开场白结束了，请直接进入技术方案。",
+            "你们公司的核心优势是什么？用一句话说。",
+            "你们对我们的业务了解多少？"
+        ],
+        "evaluator_types": ["executive", "user"],
+        "tags": ["开场白", "通用", "入门级"]
+    },
+    {
+        "id": "general_data_present",
+        "industry": "general",
+        "name": "数据和案例引用专项练习",
+        "customer_type": "通用",
+        "difficulty": 2,
+        "duration_min": 15,
+        "description": "练习如何用数据和案例支撑方案，增强说服力，同时避免数据被追问打脸",
+        "background": "「有数据有案例」是述标说服力的核心，但乱用数据比没有数据更危险",
+        "key_challenges": [
+            "数据来源可追溯（能回答「这个数据哪来的」）",
+            "案例细节真实可信（能应对追问）",
+            "数据和案例与本项目高度相关",
+            "避免数据打脸（前后矛盾）"
+        ],
+        "checklist": [
+            "至少引用3个有出处的数据",
+            "至少1个同类项目案例（行业/规模相似）",
+            "案例能经得起追问（项目名/规模/结果）",
+            "前后引用的数据保持一致"
+        ],
+        "common_questions": [
+            "你说准确率98%，这个数据是在什么条件下测的？",
+            "你提到的XX项目案例，能说说规模和具体效果吗？",
+            "你前面说节省30%成本，后面又说节省20%，哪个是对的？",
+            "这个市场占有率数据是哪家机构发布的？",
+            "你们有没有失败的案例？从中学到了什么？"
+        ],
+        "evaluator_types": ["tech", "executive"],
+        "tags": ["数据引用", "通用", "说服力"]
+    },
+    {
+        "id": "general_negotiation",
+        "industry": "general",
+        "name": "价格谈判和让步策略练习",
+        "customer_type": "通用",
+        "difficulty": 3,
+        "duration_min": 15,
+        "description": "应对评委对报价的压力，在不大幅让利的情况下维护价格",
+        "background": "「你们价格太贵了」是述标中最常见的打压手段，需要有策略地应对",
+        "key_challenges": [
+            "用价值而非成本解释价格",
+            "识别真实压价意图 vs 客气话",
+            "如何有条件让步（换取更多需求确认）",
+            "守住底线不崩盘"
+        ],
+        "checklist": [
+            "用价值拆解价格（每个价格模块对应的价值）",
+            "不轻易给出第一个折扣",
+            "如果让步，换取明确的条件（加快决策/扩大采购规模）",
+            "保持专业，不出现「那我们可以再降」的立即妥协"
+        ],
+        "common_questions": [
+            "你们报价比第二名贵了20%，凭什么？",
+            "如果能降10%，我们可以尽快决策。",
+            "我们预算只有500万，你们报了600万，能做吗？",
+            "竞争对手说他们可以用你们一半的价格实现同样功能。",
+            "合同签了，后面实施阶段还会有追加费用吗？"
+        ],
+        "evaluator_types": ["business", "executive"],
+        "tags": ["价格谈判", "通用", "商务技巧"]
+    },
+]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Adaptive Difficulty Engine
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def calculate_adaptive_difficulty(
+    session_scores: list[float],
+    current_difficulty: int,
+) -> int:
+    """
+    根据用户最近3次 QA 会话的评分，自适应调整难度等级（1-5）。
+
+    规则：
+    - 连续2次评分 >= 80 → 难度 +1（最高5）
+    - 连续2次评分 < 50 → 难度 -1（最低1）
+    - 其他情况 → 保持不变
+    """
+    if len(session_scores) < 2:
+        return current_difficulty
+
+    recent = session_scores[-2:]
+    if all(s >= 80 for s in recent):
+        return min(5, current_difficulty + 1)
+    if all(s < 50 for s in recent):
+        return max(1, current_difficulty - 1)
+    return current_difficulty
+
+
+def get_difficulty_label(difficulty: int) -> str:
+    return {1: "入门", 2: "基础", 3: "进阶", 4: "挑战", 5: "专家"}.get(difficulty, "进阶")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Scenario-Aware Question Generation
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def generate_scenario_questions(
+    scenario: dict,
+    persona: dict,
+    pitch_content: str,
+    difficulty: int,
+    num_questions: int = 3,
+) -> list[str]:
+    """
+    基于场景+评委画像+难度，生成针对性的评委问题。
+    比通用生成更具行业深度和场景针对性。
+    """
+    difficulty_label = get_difficulty_label(difficulty)
+    common_q_str = "\n".join(f"- {q}" for q in scenario.get("common_questions", [])[:5])
+    challenges_str = "\n".join(f"- {c}" for c in scenario.get("key_challenges", []))
+
+    prompt = f"""你正在扮演一位述标评委，背景如下：
+
+【评委角色】{persona.get("role", "评委")} — {persona.get("description", "")}
+【场景】{scenario["name"]}（{scenario["customer_type"]}）
+【场景背景】{scenario["background"]}
+【项目关键挑战】
+{challenges_str}
+【该场景的高频问题（仅供参考，可创新）】
+{common_q_str}
+
+【陈述方内容摘要】
+{pitch_content[:1500]}
+
+【当前难度级别】{difficulty_label}（{'难度越高，问题越刁钻、越有压迫感' if difficulty >= 4 else '难度适中，专业但不刁难'}）
+
+请生成 {num_questions} 个有针对性的问题。要求：
+1. 问题紧扣场景行业特点，而非泛泛而谈
+2. 根据陈述内容的薄弱点提问（如果陈述方案没有提到安全合规，就重点追问）
+3. 难度级别 {difficulty}/5，{'追问细节，设置压力场景' if difficulty >= 4 else '专业但友善'}
+4. 每个问题简洁，不超过60字
+5. 问题来自 {persona.get("role", "评委")} 的视角，关注 {", ".join(persona.get("focus_areas", [])[:3])}
+
+只返回问题列表，每行一个问题，不要编号。"""
+
+    result = await call_llm(prompt, system=persona.get("system_prompt", "你是述标评委。"))
+    questions = [q.strip() for q in result.strip().split("\n") if q.strip()]
+    # Filter out empty lines and numbering artifacts
+    cleaned = []
+    for q in questions:
+        q = q.lstrip("0123456789.、。 ")
+        if len(q) > 5:
+            cleaned.append(q)
+    return cleaned[:num_questions]
+
+
+async def generate_adaptive_followup(
+    scenario: dict,
+    persona: dict,
+    question: str,
+    answer: str,
+    difficulty: int,
+) -> str | None:
+    """
+    基于回答质量决定是否追问，以及追问的深度（与难度相关）。
+    """
+    difficulty_label = get_difficulty_label(difficulty)
+
+    prompt = f"""你是{persona.get("role", "评委")}，刚才问了：
+问题：{question}
+
+对方回答：{answer}
+
+当前难度：{difficulty_label}（{difficulty}/5）
+
+评估回答质量：如果回答完整清晰（80分以上），不需要追问，返回"无需追问"。
+如果回答有漏洞、避重就轻、或存在不一致，生成一个针对性追问（不超过50字）。
+难度{difficulty}级：{'直接指出漏洞，追问很具体的细节' if difficulty >= 4 else '提一个补充性问题'}
+
+只返回追问内容，或"无需追问"。不要任何解释。"""
+
+    result = await call_llm(
+        prompt,
+        system=persona.get("system_prompt", "你是述标评委。"),
+        max_tokens=200,
+    )
+    result = result.strip()
+    if "无需追问" in result or not result:
+        return None
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Golden Script (金牌话术) Extraction
+# ═══════════════════════════════════════════════════════════════════════════════
+
+async def extract_golden_scripts(
+    qa_session_messages: list[dict],
+    task_name: str,
+) -> list[dict]:
+    """
+    从 QA 会话中提取优秀话术（得分 >= 4 的回答），沉淀为知识库素材。
+    返回：[{question, answer, highlight_reason, script_type, tags}]
+    """
+    # Filter for high-quality answers
+    good_answers = []
+    for i, msg in enumerate(qa_session_messages):
+        if msg.get("role") == "answer" and msg.get("score", 0) >= 4:
+            # Find corresponding question
+            question = ""
+            for j in range(i - 1, -1, -1):
+                if qa_session_messages[j].get("role") == "question":
+                    question = qa_session_messages[j].get("content", "")
+                    break
+            if question:
+                good_answers.append({"question": question, "answer": msg.get("content", "")})
+
+    if not good_answers:
+        return []
+
+    qa_json = json.dumps(good_answers, ensure_ascii=False, indent=2)
+
+    prompt = f"""以下是述标（项目名：{task_name}）中的优秀问答记录，请提取可复用的金牌话术。
+
+{qa_json}
+
+对每个优秀回答，分析并提炼：
+[
+  {{
+    "question": "问题原文",
+    "answer": "回答原文",
+    "highlight_reason": "为什么这是优秀回答（1句话）",
+    "script_type": "化解刁难" | "数据支撑" | "案例佐证" | "价值阐述" | "承诺背书" | "情感共鸣",
+    "tags": ["标签1", "标签2"],
+    "reusability": 1-5（1=仅限本项目，5=跨行业通用）
+  }}
+]
+
+只返回 JSON 数组。"""
+
+    result = await call_llm(prompt, system="你是述标话术提炼专家。")
+    try:
+        scripts = json.loads(result.strip())
+        if not isinstance(scripts, list):
+            scripts = []
+    except json.JSONDecodeError:
+        scripts = []
+    return scripts
+
+
+# ── Helper: get scenario by id ────────────────────────────────────────────────
+
+def get_scenario(scenario_id: str) -> dict | None:
+    return next((s for s in PRESET_SCENARIOS if s["id"] == scenario_id), None)
+
+
+def list_scenarios(industry: str | None = None, difficulty: int | None = None) -> list[dict]:
+    result = PRESET_SCENARIOS
+    if industry:
+        result = [s for s in result if s["industry"] == industry]
+    if difficulty is not None:
+        result = [s for s in result if s["difficulty"] == difficulty]
+    return result
