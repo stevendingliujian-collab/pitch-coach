@@ -113,6 +113,17 @@
       </div>
 
       <div class="nav-section">
+        <div class="nav-section-label">成就</div>
+
+        <router-link to="/achievements" class="nav-item" :class="{ active: isActive('/achievements') }" data-label="游戏化成就">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+            <path d="M10 2l2.1 5.3 5.6.7-4 3.9 1 5.5L10 14.7 5.3 17.4l1-5.5-4-3.9 5.6-.7z"/>
+          </svg>
+          <span>游戏化成就</span>
+        </router-link>
+      </div>
+
+      <div class="nav-section">
         <div class="nav-section-label">账户</div>
 
         <router-link to="/pricing" class="nav-item" :class="{ active: isActive('/pricing') }" data-label="升级套餐">

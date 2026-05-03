@@ -34,6 +34,8 @@ const router = createRouter({
     { path: '/post-mortem', name: 'postMortem', component: () => import('@/views/PostMortemView.vue') },
     // P3 Open API management
     { path: '/open-api', name: 'openApi', component: () => import('@/views/OpenApiView.vue') },
+    // P4 Gamification
+    { path: '/achievements', name: 'achievements', component: () => import('@/views/GamificationView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },
