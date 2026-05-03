@@ -68,6 +68,20 @@ export interface DashboardBenchmark {
   benchmark_label: string
 }
 
+export interface FunnelStage {
+  key: string
+  label: string
+  count: number
+  conversion_from_prev: number | null
+  color: string
+}
+
+export interface DashboardFunnel {
+  period_days: number
+  stages: FunnelStage[]
+  total_registered_alltime: number
+}
+
 export const dashboardApi = {
   getOverview: () => api.get<DashboardOverview>('/dashboard/overview'),
   getTrend: (days?: number) => api.get<{ days: number; points: TrendPoint[] }>('/dashboard/trend', { params: days ? { days } : {} }),
@@ -75,4 +89,5 @@ export const dashboardApi = {
   getTasks: () => api.get<TaskReadiness[]>('/dashboard/tasks'),
   getRoi: () => api.get<DashboardROI>('/dashboard/roi'),
   getBenchmark: () => api.get<DashboardBenchmark>('/dashboard/benchmark'),
+  getFunnel: (days?: number) => api.get<DashboardFunnel>('/dashboard/funnel', { params: days ? { days } : {} }),
 }

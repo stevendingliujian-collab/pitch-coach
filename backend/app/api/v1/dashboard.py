@@ -484,3 +484,110 @@ async def get_benchmark(
         "period_days": 30,
         "benchmark_label": "行业金牌团队目标",
     }
+
+
+@router.get("/funnel")
+async def get_funnel(
+    days: int = Query(default=30, le=365),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    运营分析：注册 → 激活（完成第1次排练）→ 练习（≥3次排练）→ 付费 漏斗
+    仅管理员/经理可调用，其他角色只看自己租户数据（行为一致但仅限当前租户）。
+    """
+    from app.models.user import PcUser
+    from app.models.subscription import Subscription
+    from sqlalchemy import cast, Date
+
+    tenant_id = current_user.tenant_id
+    since = datetime.utcnow() - timedelta(days=days)
+
+    # ── 1. 注册数（period 内新建用户）
+    reg_res = await db.execute(
+        select(func.count(PcUser.id)).where(
+            PcUser.tenant_id == tenant_id,
+            PcUser.created_at >= since,
+        )
+    )
+    registered = reg_res.scalar_one() or 0
+
+    # ── 2. 激活数（period 内完成至少1次排练的用户）
+    active_res = await db.execute(
+        select(func.count(func.distinct(Rehearsal.user_id))).where(
+            Rehearsal.tenant_id == tenant_id,
+            Rehearsal.status >= 3,
+            Rehearsal.created_at >= since,
+        )
+    )
+    activated = active_res.scalar_one() or 0
+
+    # ── 3. 深度练习（period 内完成 ≥3 次排练的用户）
+    deep_subq = (
+        select(Rehearsal.user_id, func.count(Rehearsal.id).label("cnt"))
+        .where(
+            Rehearsal.tenant_id == tenant_id,
+            Rehearsal.status >= 3,
+            Rehearsal.created_at >= since,
+        )
+        .group_by(Rehearsal.user_id)
+        .having(func.count(Rehearsal.id) >= 3)
+        .subquery()
+    )
+    deep_res = await db.execute(select(func.count()).select_from(deep_subq))
+    deep_users = deep_res.scalar_one() or 0
+
+    # ── 4. 付费用户数（subscription active/trial）
+    paid_res = await db.execute(
+        select(func.count(Subscription.id)).where(
+            Subscription.tenant_id == tenant_id,
+            Subscription.status.in_(["trial", "active"]),
+        )
+    )
+    paid = paid_res.scalar_one() or 0
+
+    # ── 5. Total registered all-time (denominator for global funnel)
+    total_reg_res = await db.execute(
+        select(func.count(PcUser.id)).where(
+            PcUser.tenant_id == tenant_id,
+        )
+    )
+    total_registered = total_reg_res.scalar_one() or 0
+
+    def _rate(num: int, denom: int) -> float | None:
+        return round(num / denom * 100, 1) if denom > 0 else None
+
+    return {
+        "period_days": days,
+        "stages": [
+            {
+                "key": "registered",
+                "label": "新注册",
+                "count": registered,
+                "conversion_from_prev": None,
+                "color": "#6366F1",
+            },
+            {
+                "key": "activated",
+                "label": "已激活（≥1次排练）",
+                "count": activated,
+                "conversion_from_prev": _rate(activated, registered),
+                "color": "#22C55E",
+            },
+            {
+                "key": "deep_users",
+                "label": "深度练习（≥3次排练）",
+                "count": deep_users,
+                "conversion_from_prev": _rate(deep_users, activated),
+                "color": "#F97316",
+            },
+            {
+                "key": "paid",
+                "label": "付费用户",
+                "count": paid,
+                "conversion_from_prev": _rate(paid, deep_users),
+                "color": "#EAB308",
+            },
+        ],
+        "total_registered_alltime": total_registered,
+    }

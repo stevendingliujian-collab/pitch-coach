@@ -226,6 +226,42 @@
         </div>
       </div>
 
+      <!-- Funnel panel -->
+      <div class="chart-card funnel-card">
+        <div class="chart-header">
+          <span class="chart-title">运营漏斗</span>
+          <span class="chart-sub">注册→激活→深练→付费 · 近30天</span>
+        </div>
+        <div v-if="!funnel" class="no-data">加载中…</div>
+        <div v-else class="funnel-wrap">
+          <div
+            v-for="(stage, idx) in funnel.stages"
+            :key="stage.key"
+            class="funnel-stage"
+          >
+            <div class="funnel-bar-wrap">
+              <div
+                class="funnel-bar"
+                :style="{
+                  width: funnel.stages[0].count > 0 ? (stage.count / funnel.stages[0].count * 100) + '%' : '0%',
+                  background: stage.color,
+                }"
+              ></div>
+            </div>
+            <div class="funnel-info">
+              <span class="funnel-label">{{ stage.label }}</span>
+              <span class="funnel-count">{{ stage.count }}人</span>
+              <span
+                v-if="stage.conversion_from_prev !== null"
+                class="funnel-rate"
+                :class="{ 'rate-good': stage.conversion_from_prev >= 50, 'rate-low': stage.conversion_from_prev < 20 }"
+              >↓ {{ stage.conversion_from_prev }}%</span>
+            </div>
+          </div>
+          <div class="funnel-total">累计注册：{{ funnel.total_registered_alltime }} 人</div>
+        </div>
+      </div>
+
       <!-- Task readiness table -->
       <div class="chart-card tasks-card">
         <div class="chart-header">
@@ -293,7 +329,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { dashboardApi, type DashboardOverview, type TrendPoint, type MemberStat, type TaskReadiness, type DashboardROI, type DashboardBenchmark } from '@/api/dashboard'
+import { dashboardApi, type DashboardOverview, type TrendPoint, type MemberStat, type TaskReadiness, type DashboardROI, type DashboardBenchmark, type DashboardFunnel } from '@/api/dashboard'
 
 const loading = ref(true)
 const overview = ref<DashboardOverview | null>(null)
@@ -302,18 +338,20 @@ const members = ref<MemberStat[]>([])
 const tasks = ref<TaskReadiness[]>([])
 const roi = ref<DashboardROI | null>(null)
 const benchmark = ref<DashboardBenchmark | null>(null)
+const funnel = ref<DashboardFunnel | null>(null)
 const trendDays = ref(30)
 const chartEl = ref<HTMLElement | null>(null)
 const chartW = ref(500)
 
 onMounted(async () => {
-  const [ovRes, trendRes, membersRes, tasksRes, roiRes, bmRes] = await Promise.allSettled([
+  const [ovRes, trendRes, membersRes, tasksRes, roiRes, bmRes, funnelRes] = await Promise.allSettled([
     dashboardApi.getOverview(),
     dashboardApi.getTrend(trendDays.value),
     dashboardApi.getMembers(),
     dashboardApi.getTasks(),
     dashboardApi.getRoi(),
     dashboardApi.getBenchmark(),
+    dashboardApi.getFunnel(),
   ])
   if (ovRes.status === 'fulfilled') overview.value = ovRes.value.data
   if (trendRes.status === 'fulfilled') trendData.value = trendRes.value.data
@@ -321,6 +359,7 @@ onMounted(async () => {
   if (tasksRes.status === 'fulfilled') tasks.value = tasksRes.value.data
   if (roiRes.status === 'fulfilled') roi.value = roiRes.value.data
   if (bmRes.status === 'fulfilled') benchmark.value = bmRes.value.data
+  if (funnelRes.status === 'fulfilled') funnel.value = funnelRes.value.data
   loading.value = false
 
   await nextTick()
@@ -761,6 +800,20 @@ function formatRelative(iso: string) {
 .bm-my-val { font-size: 11px; color: #6b7280; }
 .bm-pct { font-size: 11px; font-weight: 700; color: #6b7280; }
 .bm-pct.pct-good { color: #16a34a; }
+
+/* Funnel */
+.funnel-card { grid-column: 1 / -1; }
+.funnel-wrap { display: flex; flex-direction: column; gap: 14px; padding: 4px 0; }
+.funnel-stage { display: flex; align-items: center; gap: 12px; }
+.funnel-bar-wrap { flex: 1; height: 28px; background: #f3f4f6; border-radius: 6px; overflow: hidden; }
+.funnel-bar { height: 100%; border-radius: 6px; transition: width 0.5s ease; min-width: 4px; }
+.funnel-info { width: 260px; display: flex; align-items: center; gap: 10px; }
+.funnel-label { font-size: 13px; color: #374151; font-weight: 500; flex: 1; }
+.funnel-count { font-size: 14px; font-weight: 700; color: #1a1a2e; min-width: 48px; text-align: right; }
+.funnel-rate { font-size: 12px; font-weight: 600; color: #6b7280; min-width: 52px; text-align: right; }
+.funnel-rate.rate-good { color: #22C55E; }
+.funnel-rate.rate-low { color: #EF4444; }
+.funnel-total { font-size: 12px; color: #9ca3af; margin-top: 4px; text-align: right; }
 
 @media (max-width: 1024px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
