@@ -25,7 +25,13 @@ class ParsedPPT:
 
 
 def parse_pptx(file_bytes: bytes) -> ParsedPPT:
-    """Parse a .pptx file: extract text per slide + render thumbnails via LibreOffice."""
+    """Parse .pptx or .pdf: extract text per page + render thumbnails."""
+    if file_bytes[:4] == b"%PDF":
+        return _parse_pdf(file_bytes)
+    return _parse_pptx_bytes(file_bytes)
+
+
+def _parse_pptx_bytes(file_bytes: bytes) -> ParsedPPT:
     with tempfile.TemporaryDirectory() as tmp_dir:
         pptx_path = os.path.join(tmp_dir, "deck.pptx")
         with open(pptx_path, "wb") as f:
@@ -33,7 +39,6 @@ def parse_pptx(file_bytes: bytes) -> ParsedPPT:
 
         prs = Presentation(io.BytesIO(file_bytes))
         pages: list[ParsedPage] = []
-
         thumbnails = _render_thumbnails(pptx_path, tmp_dir, len(prs.slides))
 
         for idx, slide in enumerate(prs.slides):
@@ -41,16 +46,89 @@ def parse_pptx(file_bytes: bytes) -> ParsedPPT:
             title = _extract_title(slide)
             content = _extract_body(slide)
             notes = _extract_notes(slide)
-            thumbnail = thumbnails.get(page_num, b"")
             pages.append(ParsedPage(
                 page_number=page_num,
                 title=title,
                 content=content,
                 speaker_notes=notes,
-                thumbnail_bytes=thumbnail,
+                thumbnail_bytes=thumbnails.get(page_num, b""),
             ))
 
         return ParsedPPT(page_count=len(pages), pages=pages)
+
+
+def _parse_pdf(file_bytes: bytes) -> ParsedPPT:
+    """Parse a PDF using pdftotext (text) + pdftoppm (thumbnails)."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        pdf_path = os.path.join(tmp_dir, "deck.pdf")
+        with open(pdf_path, "wb") as f:
+            f.write(file_bytes)
+
+        # Get page count via pdfinfo
+        page_count = _pdf_page_count(pdf_path)
+        if page_count == 0:
+            raise ValueError("PDF has no readable pages")
+
+        # Thumbnails: pdftoppm directly on PDF
+        png_prefix = os.path.join(tmp_dir, "slide")
+        try:
+            subprocess.run(
+                ["pdftoppm", "-png", "-r", "96", pdf_path, png_prefix],
+                capture_output=True, timeout=60, check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
+
+        pages: list[ParsedPage] = []
+        for i in range(1, page_count + 1):
+            # Extract text for this page
+            text = _pdf_page_text(pdf_path, i)
+            lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+            title = lines[0] if lines else ""
+            content = "\n".join(lines[1:])
+
+            # Find thumbnail
+            thumbnail = b""
+            for pad in (1, 2, 3):
+                path = f"{png_prefix}-{i:0{pad}d}.png"
+                if os.path.exists(path):
+                    thumbnail = _resize_png(path, 640, 480)
+                    break
+
+            pages.append(ParsedPage(
+                page_number=i,
+                title=title,
+                content=content,
+                speaker_notes="",
+                thumbnail_bytes=thumbnail,
+            ))
+
+        return ParsedPPT(page_count=page_count, pages=pages)
+
+
+def _pdf_page_count(pdf_path: str) -> int:
+    try:
+        result = subprocess.run(
+            ["pdfinfo", pdf_path],
+            capture_output=True, text=True, timeout=10,
+        )
+        for line in result.stdout.splitlines():
+            if line.lower().startswith("pages:"):
+                return int(line.split(":")[1].strip())
+    except Exception:
+        pass
+    return 0
+
+
+def _pdf_page_text(pdf_path: str, page: int) -> str:
+    try:
+        result = subprocess.run(
+            ["pdftotext", "-f", str(page), "-l", str(page), "-layout", pdf_path, "-"],
+            capture_output=True, text=True, timeout=15,
+        )
+        return result.stdout
+    except Exception:
+        return ""
 
 
 def _extract_title(slide) -> str:

@@ -201,6 +201,10 @@ useWebSocket((evt) => {
     if (evt.progress >= 100) {
       generating.value = false
       loadPlan(currentPlanId.value!)
+    } else if (evt.stage?.startsWith('error:')) {
+      generating.value = false
+      const msg = evt.stage.replace('error:', '').trim()
+      ElMessage.error(`方案生成失败：${msg || '请检查 PPT 文件格式'}`)
     }
   }
 })

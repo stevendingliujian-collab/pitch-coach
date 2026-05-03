@@ -24,7 +24,7 @@ def _get_client() -> AsyncOpenAI:
         mounts: dict = {f"https://{h}": direct for h in _NO_PROXY_HOSTS}
         if system_proxy:
             mounts["all://"] = httpx.AsyncHTTPTransport(proxy=httpx.Proxy(system_proxy))
-        http_client = httpx.AsyncClient(mounts=mounts, timeout=60)
+        http_client = httpx.AsyncClient(mounts=mounts, timeout=180)
         _client = AsyncOpenAI(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
@@ -119,15 +119,26 @@ def _build_user_prompt(
             lines.append(f"- {name}：优势={strength}，劣势={weakness}")
         lines.append("")
 
-    lines.append(f"## PPT 内容（共 {len(pages)} 页）")
+    # Cap at 30 pages to keep prompt within LLM context limits
+    MAX_PAGES = 30
+    if len(pages) > MAX_PAGES:
+        # Keep first 5, last 3, and sample the middle evenly
+        head = pages[:5]
+        tail = pages[-3:]
+        middle_count = MAX_PAGES - len(head) - len(tail)
+        step = max(1, (len(pages) - 8) // middle_count)
+        middle = pages[5:-3:step][:middle_count]
+        pages = head + middle + tail
+
+    lines.append(f"## PPT 内容（共 {len(pages)} 页，已精简）")
     for p in pages:
         lines += [
             f"\n### 第 {p['page_number']} 页",
             f"标题：{p['title']}",
-            f"内容：{p['content'][:800]}",  # truncate very long slides
+            f"内容：{p['content'][:500]}",
         ]
         if p.get("speaker_notes"):
-            lines.append(f"备注：{p['speaker_notes'][:300]}")
+            lines.append(f"备注：{p['speaker_notes'][:200]}")
 
     return "\n".join(lines)
 
