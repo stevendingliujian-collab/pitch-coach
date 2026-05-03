@@ -13,11 +13,14 @@
           <el-tab-pane label="讲解方案" name="plan">
             <PlanTab :task="task!" :plan="currentPlan" @plan-created="onPlanCreated" />
           </el-tab-pane>
+          <el-tab-pane label="AI 示范讲解" name="narration">
+            <NarrationTab :plan="currentPlan" :pages="currentPlan?.pages ?? []" />
+          </el-tab-pane>
           <el-tab-pane label="排练记录" name="rehearsal">
             <RehearsalTab :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
           </el-tab-pane>
-          <el-tab-pane label="认证状态" name="cert" disabled>
-            <!-- Phase 1 -->
+          <el-tab-pane label="审核认证" name="review">
+            <ReviewTab :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
           </el-tab-pane>
         </el-tabs>
       </template>
@@ -31,7 +34,9 @@ import { useRoute } from 'vue-router'
 import { pitchTaskApi, type PitchTask } from '@/api/pitchTask'
 import { pitchPlanApi, type PitchPlan } from '@/api/pitchPlan'
 import PlanTab from '@/components/PlanTab.vue'
+import NarrationTab from '@/components/NarrationTab.vue'
 import RehearsalTab from '@/components/RehearsalTab.vue'
+import ReviewTab from '@/components/ReviewTab.vue'
 
 const route = useRoute()
 const taskId = Number(route.params.id)

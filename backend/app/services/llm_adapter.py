@@ -236,3 +236,83 @@ def _restore_plan(plan: dict, ctx: DesensitizeContext) -> dict:
     raw = json.dumps(plan, ensure_ascii=False)
     restored = ctx.restore(raw)
     return json.loads(restored)
+
+
+_SCRIPT_SYSTEM_PROMPT = """你是一位拥有 15 年经验的专业述标主讲人，擅长将 PPT 要点转化为自然流畅、有感染力的口头讲解话术。
+
+你的任务是：根据每页 PPT 的讲解要点，生成一段适合真实述标场景的口语化讲解脚本。
+
+## 输出要求
+
+严格按照以下 JSON 结构输出，不要包含任何 JSON 之外的文字：
+
+{
+  "pages": [
+    {
+      "page_number": 1,
+      "script": "口语化的讲解脚本，自然流畅，适合朗读",
+      "duration_estimate_sec": 45,
+      "tone": "稳健型"
+    }
+  ]
+}
+
+## 脚本写作规则
+- 口语化，像在和人说话，不是在念 PPT
+- 每页 50-200 字，根据重要程度和建议时长调整
+- 核心页（importance_level=3）内容更充实，次要页简洁带过
+- 自然衔接，包含过渡语（"接下来"、"我们看一下"等）
+- 避免"第X页"、"如图所示"等演示套话
+- 述标语气：专业自信，不卑不亢"""
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    retry=retry_if_exception_type(Exception),
+    reraise=True,
+)
+async def generate_page_scripts(
+    pages: list[dict],  # [{page_number, page_title, talking_points, importance_level, suggested_duration}]
+    project_name: str = "",
+    bid_time_limit: int = 30,
+) -> list[dict]:
+    """
+    Generate spoken scripts for each plan page via LLM.
+    Returns [{page_number, script, duration_estimate_sec, tone}]
+    """
+    lines = [
+        f"## 述标项目：{project_name or '未知项目'}",
+        f"## 总时长限制：{bid_time_limit} 分钟",
+        "",
+        "## 各页讲解要点",
+    ]
+    for p in pages:
+        pts = p.get("talking_points", [])
+        pts_text = "\n".join(
+            f"  - {'[重点] ' if pt.get('is_emphasis') else ''}{pt.get('point', pt) if isinstance(pt, dict) else pt}"
+            for pt in pts
+        )
+        lines += [
+            f"\n### 第 {p['page_number']} 页（{p.get('page_title', '')}）",
+            f"重要程度：{p.get('importance_level', 2)}（1=快速带过 2=重要 3=核心）",
+            f"建议时长：{p.get('suggested_duration', 60)} 秒",
+            f"讲解要点：\n{pts_text}",
+        ]
+
+    user_prompt = "\n".join(lines)
+
+    response = await _get_client().chat.completions.create(
+        model=settings.llm_model,
+        messages=[
+            {"role": "system", "content": _SCRIPT_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=4096,
+        temperature=0.4,
+        extra_body={"enable_thinking": False},
+    )
+
+    raw = response.choices[0].message.content
+    result = _parse_json_response(raw)
+    return result.get("pages", [])

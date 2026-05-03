@@ -249,3 +249,233 @@ async def _score_rehearsal(task: Task, rehearsal_id: int):
             await db.commit()
             await progress(0, f"error: {str(exc)[:100]}")
             raise task.retry(exc=exc)
+
+
+# ---------------------------------------------------------------------------
+# Narration generation task (F2 AI 示范讲解)
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, base=DatabaseTask, name="app.workers.tasks.generate_narration_task",
+                 max_retries=1, default_retry_delay=10)
+def generate_narration_task(self, narration_id: int):
+    asyncio.run(_generate_narration(self, narration_id))
+
+
+async def _generate_narration(task: Task, narration_id: int):
+    from sqlalchemy import select
+    from app.models.narration import DemoNarration
+    from app.models.pitch_plan import PitchPlan, PlanPage
+    from app.services.llm_adapter import generate_page_scripts
+    from app.services.tts_adapter import text_to_speech
+    from app.core.storage import upload_bytes, download_bytes
+    from app.core.ws_manager import ws_manager
+    import asyncio
+    import tempfile
+    import os
+    import subprocess
+
+    async with _make_session()() as db:
+        narration = await db.get(DemoNarration, narration_id)
+        if not narration:
+            return
+
+        async def progress(pct: int, stage: str):
+            await ws_manager.send_progress(
+                tenant_id=narration.tenant_id,
+                entity_type="narration",
+                entity_id=narration_id,
+                progress=pct,
+                stage=stage,
+            )
+
+        try:
+            await progress(5, "loading_plan")
+
+            plan = await db.get(PitchPlan, narration.plan_id)
+            if not plan:
+                raise ValueError(f"Plan {narration.plan_id} not found")
+
+            result = await db.execute(
+                select(PlanPage)
+                .where(PlanPage.plan_id == narration.plan_id)
+                .order_by(PlanPage.page_number)
+            )
+            plan_pages = result.scalars().all()
+            if not plan_pages:
+                raise ValueError("Plan has no pages")
+
+            # Step 1: Generate scripts via LLM
+            await progress(10, "generating_scripts")
+            narration.status = 1
+            await db.commit()
+
+            pages_for_llm = [
+                {
+                    "page_number": p.page_number,
+                    "page_title": p.page_title or "",
+                    "talking_points": p.talking_points or [],
+                    "importance_level": p.importance_level,
+                    "suggested_duration": p.suggested_duration or 60,
+                }
+                for p in plan_pages
+            ]
+
+            import asyncio as _asyncio
+            pitch_task_name = plan.ppt_file_name
+            if plan.pitch_task_id:
+                from app.models.pitch_task import PitchTask
+                pt = await db.get(PitchTask, plan.pitch_task_id)
+                if pt:
+                    pitch_task_name = pt.name
+
+            scripts = await generate_page_scripts(
+                pages=pages_for_llm,
+                project_name=pitch_task_name,
+                bid_time_limit=plan.bid_time_limit or 30,
+            )
+            # Build a lookup {page_number: script_data}
+            script_map = {s["page_number"]: s for s in scripts}
+
+            # Step 2: Synthesize each page
+            await progress(20, "synthesizing")
+            narration.status = 2
+            await db.commit()
+
+            page_audios: list[dict] = []
+            n_pages = len(plan_pages)
+
+            # Synthesize up to 5 pages concurrently
+            CONCURRENCY = 5
+
+            async def _synth_page(p: PlanPage) -> dict:
+                script_data = script_map.get(p.page_number, {})
+                script_text = script_data.get("script", f"第{p.page_number}页讲解内容")
+                duration_est = script_data.get("duration_estimate_sec", p.suggested_duration or 60)
+
+                audio_bytes = await text_to_speech(
+                    text=script_text,
+                    voice_id=narration.voice_id,
+                    speed=narration.speed,
+                    fmt="mp3",
+                )
+                key = (
+                    f"{narration.tenant_id}/pitch-coach/narrations/"
+                    f"{narration_id}/page_{p.page_number}.mp3"
+                )
+                upload_bytes(key, audio_bytes, "audio/mpeg")
+                return {
+                    "page_number": p.page_number,
+                    "script": script_text,
+                    "tone": script_data.get("tone", "稳健型"),
+                    "audio_url": key,
+                    "duration_sec": duration_est,
+                }
+
+            sem = _asyncio.Semaphore(CONCURRENCY)
+
+            async def _synth_with_sem(p):
+                async with sem:
+                    return await _synth_page(p)
+
+            page_audios = list(await _asyncio.gather(*[_synth_with_sem(p) for p in plan_pages]))
+            page_audios.sort(key=lambda x: x["page_number"])
+
+            # Step 3: Merge all page MP3s with FFmpeg
+            await progress(80, "merging")
+            narration.status = 3
+            await db.commit()
+
+            total_audio_key = (
+                f"{narration.tenant_id}/pitch-coach/narrations/{narration_id}/full.mp3"
+            )
+            total_dur = await _merge_audio(
+                narration_id=narration_id,
+                page_audios=page_audios,
+                output_key=total_audio_key,
+                download_fn=download_bytes,
+                upload_fn=upload_bytes,
+            )
+
+            narration.page_audios = page_audios
+            narration.total_audio_url = total_audio_key
+            narration.total_duration_sec = total_dur
+            narration.status = 4  # ready
+            await db.commit()
+            await progress(100, "done")
+
+        except Exception as exc:
+            narration.status = 5  # error
+            narration.error_msg = str(exc)[:500]
+            await db.commit()
+            await progress(0, f"error: {str(exc)[:100]}")
+            raise task.retry(exc=exc)
+
+
+async def _merge_audio(
+    narration_id: int,
+    page_audios: list[dict],
+    output_key: str,
+    download_fn,
+    upload_fn,
+) -> int:
+    """Merge page MP3 files with 0.8s silence between pages using FFmpeg."""
+    import subprocess
+    import tempfile
+    import os
+
+    with tempfile.TemporaryDirectory() as tmp:
+        input_files: list[str] = []
+
+        # Write a 0.8s silent WAV for padding
+        from app.services.tts_adapter import _stub_wav, PAGE_PAUSE_MS
+        silence_bytes = _stub_wav(PAGE_PAUSE_MS / 1000)
+        silence_path = os.path.join(tmp, "silence.wav")
+        with open(silence_path, "wb") as f:
+            f.write(silence_bytes)
+
+        for i, pa in enumerate(page_audios):
+            page_bytes = download_fn(pa["audio_url"])
+            page_path = os.path.join(tmp, f"page_{i:03d}.mp3")
+            with open(page_path, "wb") as f:
+                f.write(page_bytes)
+            input_files.append(page_path)
+            if i < len(page_audios) - 1:
+                input_files.append(silence_path)
+
+        # Build FFmpeg concat filter list
+        concat_list_path = os.path.join(tmp, "concat.txt")
+        with open(concat_list_path, "w") as f:
+            for path in input_files:
+                f.write(f"file '{path}'\n")
+
+        output_path = os.path.join(tmp, "full.mp3")
+        try:
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+                    "-i", concat_list_path,
+                    "-acodec", "libmp3lame", "-q:a", "4",
+                    output_path,
+                ],
+                capture_output=True,
+                timeout=120,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # FFmpeg not available or error — concatenate raw bytes as fallback
+            all_bytes = b""
+            for path in input_files:
+                with open(path, "rb") as f:
+                    all_bytes += f.read()
+            with open(output_path, "wb") as f:
+                f.write(all_bytes)
+
+        with open(output_path, "rb") as f:
+            merged_bytes = f.read()
+
+        upload_fn(output_key, merged_bytes, "audio/mpeg")
+
+        # Estimate total duration from page durations + pauses
+        total_dur = sum(pa.get("duration_sec", 60) for pa in page_audios)
+        total_dur += int(PAGE_PAUSE_MS / 1000) * (len(page_audios) - 1)
+        return total_dur

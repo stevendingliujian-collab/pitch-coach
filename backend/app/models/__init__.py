@@ -5,10 +5,11 @@ from app.models.pitch_plan import PitchPlan, PlanPage
 from app.models.rehearsal import Rehearsal
 from app.models.review import ReviewComment, Certification
 from app.models.win_loss import WinLossRecord
+from app.models.narration import DemoNarration
 
 __all__ = [
     "Tenant", "User", "PitchTask",
     "PitchPlan", "PlanPage",
     "Rehearsal", "ReviewComment", "Certification",
-    "WinLossRecord",
+    "WinLossRecord", "DemoNarration",
 ]

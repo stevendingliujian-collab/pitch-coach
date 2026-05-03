@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>OTD AI 述标教练 — 架构 & 用户旅程</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #0f1117; color: #e2e8f0; }
+
+  .page { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+  h1 { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+  .subtitle { font-size: 13px; color: #718096; margin-bottom: 36px; }
+  h2 { font-size: 16px; font-weight: 600; color: #a0aec0; margin-bottom: 24px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ─── ARCH DIAGRAM ─── */
+  .arch-wrap { background: #1a1d27; border-radius: 16px; padding: 36px; margin-bottom: 48px; }
+  .arch-grid {
+    display: grid;
+    grid-template-columns: 200px 1fr 200px;
+    grid-template-rows: auto auto auto;
+    gap: 0;
+    position: relative;
+  }
+
+  .layer-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    color: #4a5568; text-transform: uppercase;
+    writing-mode: vertical-rl; text-orientation: mixed;
+    transform: rotate(180deg);
+    display: flex; align-items: center; justify-content: center;
+    padding: 12px 0;
+    border-right: 1px dashed #2d3748;
+    margin-right: 24px;
+  }
+  .layer-label-right {
+    writing-mode: vertical-rl;
+    border-right: none;
+    border-left: 1px dashed #2d3748;
+    margin-right: 0; margin-left: 24px;
+    transform: none;
+  }
+
+  .layer-row {
+    display: flex;
+    align-items: center;
+    padding: 20px 0;
+    border-bottom: 1px dashed #2d3748;
+    gap: 16px;
+  }
+  .layer-row:last-child { border-bottom: none; }
+
+  .node {
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; text-align: center;
+    min-width: 100px;
+    position: relative;
+    transition: transform 0.15s;
+    cursor: default;
+  }
+  .node:hover { transform: translateY(-2px); }
+  .node .icon { font-size: 22px; line-height: 1; }
+  .node .label { line-height: 1.3; }
+  .node .sublabel { font-size: 10px; font-weight: 400; opacity: 0.7; margin-top: 2px; }
+
+  .node-fe   { background: #1a365d; border: 1.5px solid #3182ce; color: #90cdf4; }
+  .node-api  { background: #22543d; border: 1.5px solid #38a169; color: #9ae6b4; }
+  .node-worker { background: #44337a; border: 1.5px solid #805ad5; color: #d6bcfa; }
+  .node-db   { background: #2d3748; border: 1.5px solid #718096; color: #e2e8f0; }
+  .node-cache{ background: #742a2a; border: 1.5px solid #fc8181; color: #fed7d7; }
+  .node-storage { background: #2a4365; border: 1.5px solid #4299e1; color: #bee3f8; }
+  .node-ext  { background: #1a202c; border: 1.5px dashed #f6ad55; color: #fbd38d; }
+  .node-ws   { background: #234e52; border: 1.5px solid #81e6d9; color: #b2f5ea; }
+
+  .arrow {
+    display: flex; align-items: center; color: #4a5568; font-size: 11px;
+    flex-shrink: 0;
+  }
+  .arrow-line { flex: 1; height: 1.5px; background: #4a5568; min-width: 20px; }
+  .arrow-head { font-size: 14px; margin-left: -4px; }
+  .arrow-label { font-size: 10px; color: #718096; white-space: nowrap; margin: 0 6px; }
+
+  .double-arrow { display: flex; align-items: center; color: #4a5568; font-size: 11px; }
+
+  .flow-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+  /* ─── JOURNEY ─── */
+  .journey-wrap { background: #1a1d27; border-radius: 16px; padding: 36px; }
+  .journey-steps { display: flex; flex-direction: column; gap: 0; }
+
+  .journey-phase { margin-bottom: 32px; }
+  .phase-title {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; padding: 6px 14px;
+    border-radius: 20px; display: inline-block; margin-bottom: 20px;
+  }
+  .phase-f1 { background: #1a365d; color: #90cdf4; }
+  .phase-f3 { background: #22543d; color: #9ae6b4; }
+
+  .steps-row { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; }
+
+  .step {
+    display: flex; flex-direction: column; align-items: center;
+    position: relative; flex-shrink: 0;
+  }
+  .step-connector {
+    display: flex; align-items: center;
+    padding-top: 28px;
+    flex-shrink: 0;
+  }
+  .step-line { width: 40px; height: 2px; background: #2d3748; }
+  .step-arrow-head { color: #4a5568; font-size: 12px; margin-left: -6px; }
+
+  .step-circle {
+    width: 56px; height: 56px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; margin-bottom: 10px;
+    position: relative; z-index: 1;
+  }
+  .step-num {
+    position: absolute; top: -4px; right: -4px;
+    width: 18px; height: 18px; border-radius: 50%;
+    background: #2d3748; font-size: 10px; font-weight: 700;
+    color: #a0aec0; display: flex; align-items: center; justify-content: center;
+  }
+  .step-name { font-size: 12px; font-weight: 600; text-align: center; max-width: 80px; line-height: 1.4; }
+  .step-detail { font-size: 10px; color: #718096; text-align: center; max-width: 80px; margin-top: 4px; line-height: 1.4; }
+
+  .step-fe   .step-circle { background: #1a365d; border: 2px solid #3182ce; }
+  .step-ai   .step-circle { background: #44337a; border: 2px solid #805ad5; }
+  .step-mixed .step-circle { background: #22543d; border: 2px solid #38a169; }
+
+  /* system decision note */
+  .sys-note {
+    display: flex; align-items: center; gap: 8px;
+    background: #2d3748; border-radius: 8px; padding: 10px 16px;
+    font-size: 12px; color: #a0aec0; margin-top: 20px;
+  }
+  .sys-badge {
+    background: #4a5568; border-radius: 4px; padding: 2px 8px;
+    font-size: 10px; font-weight: 700; color: #e2e8f0; white-space: nowrap;
+  }
+
+  .tech-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .tech-tag {
+    font-size: 10px; padding: 3px 10px; border-radius: 12px;
+    background: #2d3748; color: #a0aec0; font-family: monospace;
+  }
+
+  /* legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #718096; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>OTD AI 述标教练</h1>
+  <p class="subtitle">系统技术架构 & 用户旅程 · Phase 0a/0b MVP</p>
+
+  <!-- ════════ ARCH ════════ -->
+  <div class="arch-wrap">
+    <h2>🏗 技术架构</h2>
+
+    <!-- Row 1: Frontend -->
+    <div style="margin-bottom:24px;">
+      <div style="font-size:11px;color:#4a5568;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed #2d3748;">
+        ① 前端层 &nbsp;·&nbsp; Browser
+      </div>
+      <div class="flow-row">
+        <div class="node node-fe">
+          <span class="icon">🖥</span>
+          <span class="label">Vue 3 + TypeScript</span>
+          <span class="sublabel">Vite · Element Plus</span>
+        </div>
+        <div class="arrow"><div class="arrow-line"></div><span class="arrow-label">Axios REST</span><div class="arrow-head">▶</div></div>
+        <div class="node node-fe">
+          <span class="icon">🔄</span>
+          <span class="label">Pinia Store</span>
+          <span class="sublabel">auth · plan · rehearsal</span>
+        </div>
+        <div class="arrow"><div class="arrow-line"></div><span class="arrow-label">WebSocket</span><div class="arrow-head">▶</div></div>
+        <div class="node node-ws">
+          <span class="icon">📡</span>
+          <span class="label">Progress WS</span>
+          <span class="sublabel">ws://…/ws/{tenant}</span>
+        </div>
+        <div style="margin-left:20px;font-size:11px;color:#4a5568;">
+          <div style="margin-bottom:6px;">MediaRecorder API</div>
+          <div style="font-size:10px;color:#718096;">webm/opus 16kHz</div>
+          <div style="font-size:10px;color:#718096;">翻页时间戳记录</div>
+        </div>
+      </div>
+      <div class="tech-tags">
+        <span class="tech-tag">Vue Router</span>
+        <span class="tech-tag">useRehearsalRecorder</span>
+        <span class="tech-tag">MinIO presigned PUT</span>
+        <span class="tech-tag">port 5173</span>
+      </div>
+    </div>
+
+    <!-- Row 2: API -->
+    <div style="margin-bottom:24px;">
+      <div style="font-size:11px;color:#4a5568;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed #2d3748;">
+        ② API 层 &nbsp;·&nbsp; FastAPI + Python 3.14
+      </div>
+      <div class="flow-row">
+        <div class="node node-api" style="min-width:130px;">
+          <span class="icon">⚡</span>
+          <span class="label">FastAPI</span>
+          <span class="sublabel">Uvicorn · async/await</span>
+          <span class="sublabel">port 8001</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin:0 12px;">
+          <div style="font-size:10px;color:#718096;padding:4px 10px;background:#1a202c;border-radius:6px;">
+            /api/v1/auth
+          </div>
+          <div style="font-size:10px;color:#718096;padding:4px 10px;background:#1a202c;border-radius:6px;">
+            /api/v1/pitch-tasks
+          </div>
+          <div style="font-size:10px;color:#718096;padding:4px 10px;background:#1a202c;border-radius:6px;">
+            /api/v1/pitch-plans
+          </div>
+          <div style="font-size:10px;color:#718096;padding:4px 10px;background:#1a202c;border-radius:6px;">
+            /api/v1/rehearsals
+          </div>
+        </div>
+        <div class="node node-api">
+          <span class="icon">🔐</span>
+          <span class="label">JWT Auth</span>
+          <span class="sublabel">python-jose HS256</span>
+        </div>
+        <div class="arrow"><div class="arrow-line"></div><div class="arrow-head">▶</div></div>
+        <div class="node node-api">
+          <span class="icon">🛡</span>
+          <span class="label">Data Desensitize</span>
+          <span class="sublabel">客户名 → [客户A]</span>
+        </div>
+        <div class="arrow"><div class="arrow-line"></div><div class="arrow-head">▶</div></div>
+        <div class="node node-ws">
+          <span class="icon">📡</span>
+          <span class="label">WS Manager</span>
+          <span class="sublabel">tenant 隔离广播</span>
+        </div>
+      </div>
+      <div class="tech-tags">
+        <span class="tech-tag">SQLAlchemy 2.0 async</span>
+        <span class="tech-tag">Pydantic v2</span>
+        <span class="tech-tag">CORS · Depends()</span>
+      </div>
+    </div>
+
+    <!-- Row 3: Workers -->
+    <div style="margin-bottom:24px;">
+      <div style="font-size:11px;color:#4a5568;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed #2d3748;">
+        ③ 异步任务层 &nbsp;·&nbsp; Celery Workers
+      </div>
+      <div class="flow-row">
+        <div class="node node-cache" style="min-width:110px;">
+          <span class="icon">⚡</span>
+          <span class="label">Redis 7</span>
+          <span class="sublabel">Broker + Result</span>
+          <span class="sublabel">port 6379</span>
+        </div>
+        <div class="arrow"><div class="arrow-line"></div><span class="arrow-label">plan queue</span><div class="arrow-head">▶</div></div>
+        <div class="node node-worker">
+          <span class="icon">🧠</span>
+          <span class="label">generate_plan_task</span>
+          <span class="sublabel">queue: plan</span>
+          <span class="sublabel">NullPool asyncio</span>
+        </div>
+        <div style="margin:0 16px;display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div style="font-size:11px;color:#805ad5;">ppt_parser.py</div>
+          <div style="font-size:10px;color:#718096;">soffice→PDF</div>
+          <div style="font-size:10px;color:#718096;">pdftoppm→PNG</div>
+          <div style="font-size:10px;color:#718096;">↓</div>
+          <div style="font-size:11px;color:#805ad5;">llm_adapter.py</div>
+          <div style="font-size:10px;color:#718096;">Qwen3.6-plus</div>
+        </div>
+        <div class="arrow"><div class="arrow-line"></div><span class="arrow-label">scoring queue</span><div class="arrow-head">▶</div></div>
+        <div class="node node-worker">
+          <span class="icon">🎙</span>
+          <span class="label">score_rehearsal_task</span>
+          <span class="sublabel">queue: scoring</span>
+        </div>
+        <div style="margin:0 16px;display:flex;flex-direction:column;align-items:center;gap:4px;">
+          <div style="font-size:11px;color:#805ad5;">asr_adapter.py</div>
+          <div style="font-size:10px;color:#718096;">Paraformer/stub</div>
+          <div style="font-size:10px;color:#718096;">↓</div>
+          <div style="font-size:11px;color:#805ad5;">scoring_engine.py</div>
+          <div style="font-size:10px;color:#718096;">规则引擎评分</div>
+        </div>
+      </div>
+      <div class="tech-tags">
+        <span class="tech-tag">Celery 5 prefork</span>
+        <span class="tech-tag">asyncio.run() per task</span>
+        <span class="tech-tag">max_retries=2</span>
+        <span class="tech-tag">NullPool 防 loop 复用</span>
+      </div>
+    </div>
+
+    <!-- Row 4: Data Layer -->
+    <div style="margin-bottom:24px;">
+      <div style="font-size:11px;color:#4a5568;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed #2d3748;">
+        ④ 数据 & 存储层
+      </div>
+      <div class="flow-row">
+        <div class="node node-db" style="min-width:120px;">
+          <span class="icon">🐘</span>
+          <span class="label">PostgreSQL 15</span>
+          <span class="sublabel">port 5432</span>
+          <span class="sublabel">Alembic 迁移</span>
+        </div>
+        <div style="margin:0 16px;font-size:10px;color:#718096;line-height:1.8;">
+          tenant &nbsp;·&nbsp; pc_user<br>
+          pitch_task &nbsp;·&nbsp; pitch_plan<br>
+          plan_page &nbsp;·&nbsp; rehearsal<br>
+          review_comment &nbsp;·&nbsp; certification
+        </div>
+        <div class="node node-storage" style="min-width:120px;">
+          <span class="icon">🪣</span>
+          <span class="label">MinIO</span>
+          <span class="sublabel">S3-compatible OSS</span>
+          <span class="sublabel">port 9000</span>
+        </div>
+        <div style="margin:0 16px;font-size:10px;color:#718096;line-height:1.8;">
+          {tenant_id}/pitch-coach/<br>
+          &nbsp;&nbsp;ppts/*.pptx<br>
+          &nbsp;&nbsp;plans/{id}/thumb_*.png<br>
+          &nbsp;&nbsp;rehearsals/*/*.webm
+        </div>
+        <div class="node node-cache">
+          <span class="icon">🔴</span>
+          <span class="label">Redis 7</span>
+          <span class="sublabel">Session cache</span>
+          <span class="sublabel">Task results</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 5: External -->
+    <div>
+      <div style="font-size:11px;color:#4a5568;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;padding-bottom:8px;border-bottom:1px dashed #2d3748;">
+        ⑤ 外部服务
+      </div>
+      <div class="flow-row">
+        <div class="node node-ext">
+          <span class="icon">🤖</span>
+          <span class="label">DashScope</span>
+          <span class="sublabel">Qwen3.6-plus LLM</span>
+          <span class="sublabel">coding.dashscope.aliyuncs.com</span>
+        </div>
+        <div style="margin:0 20px;font-size:10px;color:#4a5568;text-align:center;line-height:1.8;">
+          OpenAI-compatible API<br>
+          httpx mounts (no proxy)<br>
+          tenacity 3-retry
+        </div>
+        <div class="node node-ext">
+          <span class="icon">🎤</span>
+          <span class="label">ASR 服务</span>
+          <span class="sublabel">Paraformer-Large</span>
+          <span class="sublabel">（开发中用 stub）</span>
+        </div>
+        <div style="margin:0 20px;font-size:10px;color:#4a5568;text-align:center;line-height:1.8;">
+          ASR_PROVIDER=paraformer<br>
+          FunASR HTTP<br>
+          webm/opus → 文字 + 时间戳
+        </div>
+        <div class="node node-ext">
+          <span class="icon">🔊</span>
+          <span class="label">Fish Audio TTS</span>
+          <span class="sublabel">Phase 1 F2</span>
+          <span class="sublabel">（待接入）</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend" style="margin-top:28px;padding-top:20px;border-top:1px dashed #2d3748;">
+      <div class="legend-item"><div class="legend-dot" style="background:#3182ce;"></div> 前端 Vue 3</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#38a169;"></div> 后端 FastAPI</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#805ad5;"></div> Celery Worker</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#718096;"></div> PostgreSQL</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fc8181;"></div> Redis</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4299e1;"></div> MinIO</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f6ad55;border-style:dashed;"></div> 外部 API</div>
+    </div>
+  </div>
+
+  <!-- ════════ JOURNEY ════════ -->
+  <div class="journey-wrap">
+    <h2>🚀 用户旅程</h2>
+
+    <!-- Phase F1 -->
+    <div class="journey-phase">
+      <span class="phase-title phase-f1">F1 · 上传 PPT → AI 讲解方案</span>
+      <div class="steps-row">
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">1</span>🔑</div>
+          <div class="step-name">注册 / 登录</div>
+          <div class="step-detail">JWT Token<br>租户隔离</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">2</span>📁</div>
+          <div class="step-name">创建项目</div>
+          <div class="step-detail">客户/行业/<br>述标时间限制</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">3</span>📤</div>
+          <div class="step-name">上传 PPT</div>
+          <div class="step-detail">MinIO 直传<br>.pptx / .pdf</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-ai">
+          <div class="step-circle"><span class="step-num">4</span>⚙️</div>
+          <div class="step-name">解析幻灯片</div>
+          <div class="step-detail">python-pptx<br>soffice→pdftoppm<br>缩略图 PNG</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-ai">
+          <div class="step-circle"><span class="step-num">5</span>🤖</div>
+          <div class="step-name">AI 生成方案</div>
+          <div class="step-detail">Qwen3.6-plus<br>脱敏→LLM→还原<br>WebSocket进度</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">6</span>📋</div>
+          <div class="step-name">查看讲解方案</div>
+          <div class="step-detail">左侧PPT缩略图<br>右侧逐页要点<br>重音/过渡话术</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">7</span>✏️</div>
+          <div class="step-name">编辑方案</div>
+          <div class="step-detail">修改讲解要点<br>标记已人工修改</div>
+        </div>
+
+      </div>
+
+      <div class="sys-note" style="margin-top:16px;">
+        <span class="sys-badge">SYSTEM</span>
+        API 返回 202 → Celery plan 队列 → ppt_parser → llm_adapter → WS 推送进度（5%…100%） → DB 写入 plan_page 含缩略图 key → presigned URL 签名返回前端
+      </div>
+    </div>
+
+    <!-- Phase F3 -->
+    <div class="journey-phase">
+      <span class="phase-title phase-f3">F3 · 排练录音 → AI 评分报告</span>
+      <div class="steps-row">
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">8</span>🖥</div>
+          <div class="step-name">进入排练模式</div>
+          <div class="step-detail">全屏深色界面<br>幻灯片预览<br>讲解提示面板</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">9</span>🎙</div>
+          <div class="step-name">录音排练</div>
+          <div class="step-detail">MediaRecorder<br>翻页 → 时间戳<br>暂停 / 继续</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">10</span>📤</div>
+          <div class="step-name">提交排练</div>
+          <div class="step-detail">webm 上传 MinIO<br>page_timings<br>POST /complete</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-ai">
+          <div class="step-circle"><span class="step-num">11</span>📝</div>
+          <div class="step-name">ASR 转录</div>
+          <div class="step-detail">Paraformer<br>文字 + 时间戳<br>scoring 队列</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-ai">
+          <div class="step-circle"><span class="step-num">12</span>📊</div>
+          <div class="step-name">规则引擎评分</div>
+          <div class="step-detail">填充词检测<br>语速分析<br>时间分配</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-mixed">
+          <div class="step-circle"><span class="step-num">13</span>📈</div>
+          <div class="step-name">查看报告</div>
+          <div class="step-detail">综合分 + 三维度<br>逐页时间分析<br>AI 改进建议</div>
+        </div>
+
+        <div class="step-connector"><div class="step-line"></div><div class="step-arrow-head">▶</div></div>
+
+        <div class="step step-fe">
+          <div class="step-circle"><span class="step-num">14</span>🔁</div>
+          <div class="step-name">再次排练</div>
+          <div class="step-detail">历史记录对比<br>分数趋势</div>
+        </div>
+
+      </div>
+
+      <div class="sys-note" style="margin-top:16px;">
+        <span class="sys-badge">SYSTEM</span>
+        POST /complete → Celery scoring 队列 → download_bytes(MinIO) → transcribe(ASR) → score_rehearsal(规则引擎) → DB 写分数 → 前端轮询 status 变 3 → 跳转报告页
+      </div>
+    </div>
+
+    <!-- scoring engine detail -->
+    <div style="background:#1e2230;border-radius:12px;padding:20px;margin-top:8px;">
+      <div style="font-size:12px;font-weight:700;color:#a0aec0;margin-bottom:16px;letter-spacing:1px;">📐 评分引擎 scoring_engine.py — 三维度算法</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+
+        <div style="background:#1a1d27;border-radius:8px;padding:14px;border-left:3px solid #9ae6b4;">
+          <div style="font-size:13px;font-weight:600;color:#9ae6b4;margin-bottom:8px;">💬 流畅度 Fluency</div>
+          <div style="font-size:11px;color:#718096;line-height:1.8;">
+            填充词检测：嗯/那个/就是/然后/这个<br>
+            每100字扣分（上限3分/百字）<br>
+            满分100 = 0个填充词
+          </div>
+        </div>
+
+        <div style="background:#1a1d27;border-radius:8px;padding:14px;border-left:3px solid #90cdf4;">
+          <div style="font-size:13px;font-weight:600;color:#90cdf4;margin-bottom:8px;">⚡ 语速 Rate</div>
+          <div style="font-size:11px;color:#718096;line-height:1.8;">
+            目标：200–260 字/分钟<br>
+            偏慢（&lt;150）或偏快（&gt;300）扣分<br>
+            标准差大（节奏不稳）额外扣分
+          </div>
+        </div>
+
+        <div style="background:#1a1d27;border-radius:8px;padding:14px;border-left:3px solid #fbd38d;">
+          <div style="font-size:13px;font-weight:600;color:#fbd38d;margin-bottom:8px;">⏱ 时间控制 Timing</div>
+          <div style="font-size:11px;color:#718096;line-height:1.8;">
+            总时长偏差 vs 计划时长<br>
+            核心页（importance=3）时间占比<br>
+            建议占比 ≥ 60%
+          </div>
+        </div>
+
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:#4a5568;">
+        综合分 = 流畅度 × 0.4 + 语速 × 0.3 + 时间控制 × 0.3
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

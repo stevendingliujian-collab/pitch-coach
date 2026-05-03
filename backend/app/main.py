@@ -34,12 +34,14 @@ app.add_middleware(
 )
 
 # Register API routers
-from app.api.v1 import auth, pitch_tasks, pitch_plans, rehearsals  # noqa: E402
+from app.api.v1 import auth, pitch_tasks, pitch_plans, rehearsals, narrations, reviews  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(pitch_tasks.router, prefix="/api/v1")
 app.include_router(pitch_plans.router, prefix="/api/v1")
 app.include_router(rehearsals.router, prefix="/api/v1")
+app.include_router(narrations.router, prefix="/api/v1")
+app.include_router(reviews.router, prefix="/api/v1")
 
 
 @app.get("/health")
