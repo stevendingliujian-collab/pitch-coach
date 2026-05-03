@@ -22,6 +22,8 @@ const router = createRouter({
     { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeView.vue') },
     // P1 F9 Daily micro-practice (free, unlimited)
     { path: '/daily-practice', name: 'dailyPractice', component: () => import('@/views/DailyPracticeView.vue') },
+    // P2 Pricing
+    { path: '/pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },
