@@ -159,6 +159,27 @@ def _build_user_prompt(
     return "\n".join(lines)
 
 
+async def call_llm(
+    user_prompt: str,
+    *,
+    system: str = "你是一位专业的AI助手，按要求输出JSON格式内容。",
+    max_tokens: int = 2000,
+    temperature: float = 0.3,
+) -> str:
+    """Generic single-turn LLM call. Returns the raw text response."""
+    client = _get_client()
+    resp = await client.chat.completions.create(
+        model=settings.llm_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_prompt},
+        ],
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )
+    return resp.choices[0].message.content or ""
+
+
 @retry(
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),

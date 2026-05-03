@@ -49,6 +49,7 @@
       <RehearsalTab v-if="activeTab === 'rehearsal'" :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
       <TrainingTab  v-if="activeTab === 'training'"  :task-id="taskId" :plan-id="currentPlan?.id ?? null" :pages="currentPlan?.pages ?? []" />
       <ReviewTab    v-if="activeTab === 'review'"    :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
+      <RubricTab    v-if="activeTab === 'rubric'"    :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
     </div>
   </div>
 </template>
@@ -64,6 +65,7 @@ import NarrationTab from '@/components/NarrationTab.vue'
 import RehearsalTab from '@/components/RehearsalTab.vue'
 import TrainingTab  from '@/components/TrainingTab.vue'
 import ReviewTab    from '@/components/ReviewTab.vue'
+import RubricTab    from '@/components/RubricTab.vue'
 
 const route   = useRoute()
 const router  = useRouter()
@@ -98,6 +100,11 @@ const tabs = [
     key: 'review',
     label: '审核认证',
     icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 1l1.5 4h4l-3 2.5 1.5 4L7 9 3 11.5l1.5-4L1.5 5h4z"/></svg>`,
+  },
+  {
+    key: 'rubric',
+    label: '评分对标',
+    icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="1" width="10" height="12" rx="1"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="8" x2="10" y2="8"/><polyline points="6 10 8 12 12 8"/></svg>`,
   },
 ]
 
