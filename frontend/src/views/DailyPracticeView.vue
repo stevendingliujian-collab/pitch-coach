@@ -18,20 +18,31 @@
       <el-skeleton :rows="6" animated />
     </div>
 
-    <!-- Upcoming pitch countdown banner -->
-    <div v-if="today?.upcoming_task" class="countdown-banner">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path d="M8 1l1.5 3.5 3.5.5-2.5 2.5.6 3.5L8 9.5 4.9 11l.6-3.5L3 5l3.5-.5z"/>
-      </svg>
-      <span class="countdown-text">
-        距「{{ today.upcoming_task.name }}」述标还有
-        <strong class="countdown-days">{{ today.upcoming_task.days_left }}</strong> 天，保持每日练习！
-      </span>
-      <router-link :to="`/projects/${today.upcoming_task.task_id}`" class="countdown-link">查看详情 →</router-link>
-    </div>
+    <!-- Main 2-col layout (shown when not loading) -->
+    <div v-if="!loading && today" class="v2-content dp-layout">
 
-    <!-- Main 2-col layout -->
-    <div v-else-if="today" class="v2-content dp-layout">
+      <!-- Upcoming pitch countdown banner (inside the layout) -->
+      <div
+        v-if="today.upcoming_task"
+        class="countdown-banner"
+        :class="{ 'countdown-urgent': today.upcoming_task.days_left <= 2 }"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="8" cy="8" r="6.5"/>
+          <polyline points="8 4.5 8 8 10 10"/>
+        </svg>
+        <span class="countdown-text">
+          <template v-if="today.practice_type === 'bid_countdown'">
+            🔥 述标倒计时练习已激活 — 距「{{ today.upcoming_task.name }}」还有
+            <strong class="countdown-days">{{ today.upcoming_task.days_left }}</strong> 天
+          </template>
+          <template v-else>
+            距「{{ today.upcoming_task.name }}」述标还有
+            <strong class="countdown-days">{{ today.upcoming_task.days_left }}</strong> 天，保持每日练习！
+          </template>
+        </span>
+        <router-link :to="`/projects/${today.upcoming_task.task_id}`" class="countdown-link">查看项目 →</router-link>
+      </div>
 
       <!-- ── Left: Exercise card ── -->
       <div class="dp-main">
@@ -471,7 +482,7 @@ function formatTime(sec: number) {
 }
 
 function typeLabel(type: string) {
-  return ({ intro: '口播开场', case: '案例讲解', term: '术语解释', qa: '质疑回应', competitive: '竞品话术', review: '综合复习' } as Record<string, string>)[type] ?? type
+  return ({ intro: '口播开场', case: '案例讲解', term: '术语解释', qa: '质疑回应', competitive: '竞品话术', review: '综合复习', bid_countdown: '述标冲刺' } as Record<string, string>)[type] ?? type
 }
 
 function scoreClass(score: number) {
@@ -494,13 +505,21 @@ function scoreRingColor(score: number) {
 .countdown-banner {
   display: flex; align-items: center; gap: 10px;
   background: linear-gradient(135deg, #FEF3C7, #FDE68A);
-  border-bottom: 1px solid #F59E0B;
-  padding: 10px 24px; font-size: 13px; color: #78350F;
+  border: 1px solid #F59E0B;
+  border-radius: 10px;
+  padding: 10px 16px; font-size: 13px; color: #78350F;
+  margin-bottom: 16px;
 }
-.countdown-days { font-size: 18px; font-weight: 800; color: #B45309; margin: 0 3px; }
+.countdown-banner.countdown-urgent {
+  background: linear-gradient(135deg, #FEE2E2, #FECACA);
+  border-color: #EF4444;
+  color: #7F1D1D;
+}
+.countdown-banner.countdown-urgent .countdown-days { color: #DC2626; }
+.countdown-days { font-size: 16px; font-weight: 800; color: #B45309; margin: 0 3px; }
 .countdown-link {
   margin-left: auto; font-size: 12px; font-weight: 600;
-  color: #92400E; text-decoration: none;
+  color: #92400E; text-decoration: none; white-space: nowrap;
 }
 .countdown-link:hover { text-decoration: underline; }
 
@@ -513,6 +532,8 @@ function scoreRingColor(score: number) {
   gap: 20px;
   align-items: start;
 }
+/* Countdown banner spans both columns */
+.countdown-banner { grid-column: 1 / -1; }
 @media (max-width: 860px) { .dp-layout { grid-template-columns: 1fr; } }
 
 /* Exercise card */
@@ -529,6 +550,7 @@ function scoreRingColor(score: number) {
 .type-qa    { background: rgba(245,158,11,0.1);  color: #D97706; }
 .type-competitive { background: rgba(239,68,68,0.1); color: #DC2626; }
 .type-review { background: rgba(107,114,128,0.1); color: #4B5563; }
+.type-bid_countdown { background: rgba(239,68,68,0.15); color: #EF4444; font-weight: 800; }
 
 .ex-weekday { font-size: 12px; color: var(--t-faint); }
 .ex-done-badge { font-size: 11px; font-weight: 600; color: var(--green); background: rgba(34,197,94,0.1); padding: 2px 8px; border-radius: 10px; }

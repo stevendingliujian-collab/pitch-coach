@@ -107,44 +107,15 @@ async def get_today_practice(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return today's practice item and user's current streak."""
+    """Return today's practice item and user's current streak.
+
+    When a bid_date is within 14 days, switches to bid-specific warm-up content
+    so the user stays focused on the upcoming pitch.
+    """
     today = date.today()
     weekday = today.weekday()  # 0=Mon ... 6=Sun
 
-    # Pick today's system item by weekday
-    result = await db.execute(
-        select(DailyPracticeItem)
-        .where(DailyPracticeItem.weekday == weekday, DailyPracticeItem.is_active.is_(True))
-        .limit(1)
-    )
-    item = result.scalar_one_or_none()
-    if not item:
-        # Fallback: any active item
-        result = await db.execute(
-            select(DailyPracticeItem)
-            .where(DailyPracticeItem.is_active.is_(True))
-            .limit(1)
-        )
-        item = result.scalar_one_or_none()
-    if not item:
-        raise HTTPException(503, "No practice content available")
-
-    # Check if user already has a log for today
-    log_result = await db.execute(
-        select(DailyPracticeLog)
-        .where(
-            DailyPracticeLog.user_id == current_user.id,
-            DailyPracticeLog.practice_date == today,
-        )
-        .order_by(DailyPracticeLog.id.desc())
-        .limit(1)
-    )
-    log = log_result.scalar_one_or_none()
-
-    # Streak
-    streak = await _get_or_create_streak(current_user, db)
-
-    # Upcoming pitch within 14 days
+    # ── Check for upcoming pitch within 14 days ──────────────────────────────
     from app.models.pitch_task import PitchTask
     upcoming_task: UpcomingTask | None = None
     deadline = today + timedelta(days=14)
@@ -165,13 +136,88 @@ async def get_today_practice(
             days_left=(upcoming.bid_date - today).days,
         )
 
+    # ── Select practice item ──────────────────────────────────────────────────
+    # If bid is ≤ 7 days away, use bid-specific countdown content (higher priority)
+    bid_mode = upcoming_task is not None and upcoming_task.days_left <= 7
+
+    if bid_mode:
+        # Look for a bid_countdown type item first
+        result = await db.execute(
+            select(DailyPracticeItem)
+            .where(
+                DailyPracticeItem.practice_type == "bid_countdown",
+                DailyPracticeItem.is_active.is_(True),
+            )
+            .limit(1)
+        )
+        item = result.scalar_one_or_none()
+        # Fallback to weekday item if no bid_countdown item exists
+        if not item:
+            bid_mode = False
+
+    if not bid_mode:
+        # Normal weekday rotation
+        result = await db.execute(
+            select(DailyPracticeItem)
+            .where(DailyPracticeItem.weekday == weekday, DailyPracticeItem.is_active.is_(True))
+            .limit(1)
+        )
+        item = result.scalar_one_or_none()
+        if not item:
+            # Fallback: any active item
+            result = await db.execute(
+                select(DailyPracticeItem)
+                .where(DailyPracticeItem.is_active.is_(True))
+                .limit(1)
+            )
+            item = result.scalar_one_or_none()
+
+    if not item:
+        raise HTTPException(503, "No practice content available")
+
+    # Check if user already has a log for today
+    log_result = await db.execute(
+        select(DailyPracticeLog)
+        .where(
+            DailyPracticeLog.user_id == current_user.id,
+            DailyPracticeLog.practice_date == today,
+        )
+        .order_by(DailyPracticeLog.id.desc())
+        .limit(1)
+    )
+    log = log_result.scalar_one_or_none()
+
+    # Streak
+    streak = await _get_or_create_streak(current_user, db)
+
+    # If bid_mode, personalise title/instruction with the bid name
+    if bid_mode and upcoming_task:
+        days_left = upcoming_task.days_left
+        task_name = upcoming_task.name
+        urgency = "今天" if days_left == 0 else f"还有 {days_left} 天"
+        personalised_title = f"「{task_name}」述标倒计时练习（{urgency}）"
+        personalised_instruction = (
+            f"距「{task_name}」述标{urgency}，今天做最后冲刺练习：\n\n"
+            f"1. 用 30 秒完成自我介绍 + 公司简介\n"
+            f"2. 用 60 秒讲述与「{task_name}」最相关的一个成功案例\n"
+            f"3. 用 30 秒预告本次方案的 1-2 个核心亮点\n\n"
+            f"提示：不要死记硬背，保持自然流畅，注意眼神和语速。"
+        )
+        personalised_key_points = ["自我介绍", "公司简介", "案例", "方案亮点", "自然流畅"]
+        personalised_duration = 120
+    else:
+        personalised_title = item.title
+        personalised_instruction = item.instruction
+        personalised_key_points = item.key_points or []
+        personalised_duration = item.target_duration_sec
+
     return TodayPracticeResponse(
         item_id=item.id,
-        practice_type=item.practice_type,
-        title=item.title,
-        instruction=item.instruction,
-        target_duration_sec=item.target_duration_sec,
-        key_points=item.key_points or [],
+        practice_type="bid_countdown" if bid_mode else item.practice_type,
+        title=personalised_title,
+        instruction=personalised_instruction,
+        target_duration_sec=personalised_duration,
+        key_points=personalised_key_points,
         log_id=log.id if log else None,
         status=log.status if log else 0,
         current_streak=streak.current_streak,
