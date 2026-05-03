@@ -51,10 +51,28 @@ export interface DashboardROI {
   won_budget_total: number  // 万元
 }
 
+export interface BenchmarkMetric {
+  key: string
+  label: string
+  unit: string
+  my_value: number | null
+  target: number
+  pct_of_target: number | null
+  higher_is_better: boolean
+}
+
+export interface DashboardBenchmark {
+  metrics: BenchmarkMetric[]
+  overall_pct: number | null
+  period_days: number
+  benchmark_label: string
+}
+
 export const dashboardApi = {
   getOverview: () => api.get<DashboardOverview>('/dashboard/overview'),
   getTrend: (days?: number) => api.get<{ days: number; points: TrendPoint[] }>('/dashboard/trend', { params: days ? { days } : {} }),
   getMembers: () => api.get<MemberStat[]>('/dashboard/members'),
   getTasks: () => api.get<TaskReadiness[]>('/dashboard/tasks'),
   getRoi: () => api.get<DashboardROI>('/dashboard/roi'),
+  getBenchmark: () => api.get<DashboardBenchmark>('/dashboard/benchmark'),
 }

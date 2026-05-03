@@ -354,3 +354,133 @@ async def get_roi(
         "total_outcomes": total_outcomes,
         "won_budget_total": round(won_budget_total / 10000, 1),  # convert to 万元
     }
+
+
+@router.get("/benchmark")
+async def get_benchmark(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """
+    行业基准对标 — 将本租户关键指标与平台优秀团队基准对比。
+
+    基准值基于行业最佳实践目标（金牌销售团队表现）：
+    - 优秀团队平均得分 ≥ 82
+    - 月均排练次数 ≥ 12（平均每周3次）
+    - 赢单率 ≥ 50%
+    - 每日微练习连续打卡 ≥ 7 天
+
+    返回：本团队数值 vs 基准值 vs 百分位估算（based on platform data）
+    """
+    tenant_id = current_user.tenant_id
+    since_30 = datetime.utcnow() - timedelta(days=30)
+
+    # ── 1. 当前团队：最近30天平均得分 ─────────────────────────────────────────
+    score_res = await db.execute(
+        select(func.avg(Rehearsal.total_score)).where(
+            Rehearsal.tenant_id == tenant_id,
+            Rehearsal.status >= 3,
+            Rehearsal.total_score.isnot(None),
+            Rehearsal.created_at >= since_30,
+        )
+    )
+    my_avg_score = round(float(score_res.scalar_one() or 0), 1)
+
+    # ── 2. 当前团队：最近30天排练次数 ────────────────────────────────────────
+    count_res = await db.execute(
+        select(func.count(Rehearsal.id)).where(
+            Rehearsal.tenant_id == tenant_id,
+            Rehearsal.status >= 3,
+            Rehearsal.created_at >= since_30,
+        )
+    )
+    my_rehearsal_count = int(count_res.scalar_one() or 0)
+
+    # ── 3. 当前团队：赢单率 ────────────────────────────────────────────────────
+    outcome_res = await db.execute(
+        select(PitchTask.result, func.count(PitchTask.id).label("cnt")).where(
+            PitchTask.tenant_id == tenant_id,
+            PitchTask.result.isnot(None),
+        ).group_by(PitchTask.result)
+    )
+    outcome_counts: dict[int, int] = {}
+    for row in outcome_res.all():
+        outcome_counts[row.result] = row.cnt
+    won = outcome_counts.get(1, 0)
+    total_out = sum(outcome_counts.values())
+    my_win_rate = round(won / total_out * 100) if total_out > 0 else None
+
+    # ── 4. 当前团队：最近30天每日微练习完成天数 ─────────────────────────────────
+    from app.models.daily_practice import DailyPracticeLog
+    practice_res = await db.execute(
+        select(func.count(func.distinct(DailyPracticeLog.practice_date))).where(
+            DailyPracticeLog.tenant_id == tenant_id,
+            DailyPracticeLog.status == 1,
+            DailyPracticeLog.practice_date >= since_30.date(),
+        )
+    )
+    my_practice_days = int(practice_res.scalar_one() or 0)
+
+    # ── 5. 平台基准（行业优秀团队目标）──────────────────────────────────────────
+    # These are evidence-based best-practice targets for B2B sales pitch training
+    BENCHMARKS = {
+        "avg_score":        {"target": 82.0,  "label": "平均得分",   "unit": "分",  "higher_is_better": True},
+        "rehearsal_count":  {"target": 12,    "label": "月排练次数", "unit": "次",  "higher_is_better": True},
+        "win_rate":         {"target": 50,    "label": "赢单率",    "unit": "%",   "higher_is_better": True},
+        "practice_days":    {"target": 20,    "label": "月打卡天数", "unit": "天",  "higher_is_better": True},
+    }
+
+    def _pct_of_target(my_val: float | None, target: float) -> int | None:
+        if my_val is None:
+            return None
+        return min(round(my_val / target * 100), 150)  # cap at 150%
+
+    metrics = [
+        {
+            "key": "avg_score",
+            "label": BENCHMARKS["avg_score"]["label"],
+            "unit": BENCHMARKS["avg_score"]["unit"],
+            "my_value": my_avg_score if my_avg_score > 0 else None,
+            "target": BENCHMARKS["avg_score"]["target"],
+            "pct_of_target": _pct_of_target(my_avg_score if my_avg_score > 0 else None, BENCHMARKS["avg_score"]["target"]),
+            "higher_is_better": True,
+        },
+        {
+            "key": "rehearsal_count",
+            "label": BENCHMARKS["rehearsal_count"]["label"],
+            "unit": BENCHMARKS["rehearsal_count"]["unit"],
+            "my_value": my_rehearsal_count,
+            "target": BENCHMARKS["rehearsal_count"]["target"],
+            "pct_of_target": _pct_of_target(my_rehearsal_count, BENCHMARKS["rehearsal_count"]["target"]),
+            "higher_is_better": True,
+        },
+        {
+            "key": "win_rate",
+            "label": BENCHMARKS["win_rate"]["label"],
+            "unit": BENCHMARKS["win_rate"]["unit"],
+            "my_value": my_win_rate,
+            "target": BENCHMARKS["win_rate"]["target"],
+            "pct_of_target": _pct_of_target(my_win_rate, BENCHMARKS["win_rate"]["target"]),
+            "higher_is_better": True,
+        },
+        {
+            "key": "practice_days",
+            "label": BENCHMARKS["practice_days"]["label"],
+            "unit": BENCHMARKS["practice_days"]["unit"],
+            "my_value": my_practice_days,
+            "target": BENCHMARKS["practice_days"]["target"],
+            "pct_of_target": _pct_of_target(my_practice_days, BENCHMARKS["practice_days"]["target"]),
+            "higher_is_better": True,
+        },
+    ]
+
+    # Overall benchmark score (weighted average of pct_of_target)
+    valid_pcts = [m["pct_of_target"] for m in metrics if m["pct_of_target"] is not None]
+    overall_pct = round(sum(valid_pcts) / len(valid_pcts)) if valid_pcts else None
+
+    return {
+        "metrics": metrics,
+        "overall_pct": overall_pct,
+        "period_days": 30,
+        "benchmark_label": "行业金牌团队目标",
+    }

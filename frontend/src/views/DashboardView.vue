@@ -178,6 +178,54 @@
         </div>
       </div>
 
+      <!-- Benchmark panel -->
+      <div class="chart-card benchmark-card">
+        <div class="chart-header">
+          <span class="chart-title">行业基准对标</span>
+          <span class="chart-sub">{{ benchmark?.benchmark_label ?? '金牌团队目标' }} · 近30天</span>
+        </div>
+        <div v-if="!benchmark" class="no-data">加载中…</div>
+        <div v-else class="benchmark-grid">
+          <!-- Overall score ring -->
+          <div class="bm-overall">
+            <svg viewBox="0 0 80 80" class="bm-ring-svg">
+              <circle cx="40" cy="40" r="32" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="7"/>
+              <circle
+                cx="40" cy="40" r="32" fill="none"
+                :stroke="benchmark.overall_pct !== null && benchmark.overall_pct >= 100 ? '#22C55E' : benchmark.overall_pct !== null && benchmark.overall_pct >= 60 ? '#6366F1' : '#EF4444'"
+                stroke-width="7" stroke-linecap="round"
+                :stroke-dasharray="`${201.06}`"
+                :stroke-dashoffset="benchmark.overall_pct !== null ? 201.06 * (1 - Math.min(benchmark.overall_pct, 100) / 100) : 201.06"
+                transform="rotate(-90 40 40)"
+                style="transition: stroke-dashoffset 0.6s ease"
+              />
+            </svg>
+            <div class="bm-overall-val">{{ benchmark.overall_pct !== null ? benchmark.overall_pct + '%' : '—' }}</div>
+            <div class="bm-overall-label">综合达标率</div>
+          </div>
+          <!-- Individual metrics -->
+          <div class="bm-metrics">
+            <div v-for="m in benchmark.metrics" :key="m.key" class="bm-metric">
+              <div class="bm-metric-head">
+                <span class="bm-metric-label">{{ m.label }}</span>
+                <span class="bm-metric-target">目标 {{ m.target }}{{ m.unit }}</span>
+              </div>
+              <div class="bm-bar-wrap">
+                <div
+                  class="bm-bar-fill"
+                  :class="{ 'bar-good': (m.pct_of_target ?? 0) >= 100, 'bar-ok': (m.pct_of_target ?? 0) >= 60 && (m.pct_of_target ?? 0) < 100, 'bar-low': (m.pct_of_target ?? 0) < 60 }"
+                  :style="{ width: Math.min(m.pct_of_target ?? 0, 100) + '%' }"
+                />
+              </div>
+              <div class="bm-metric-vals">
+                <span class="bm-my-val">我的：{{ m.my_value !== null ? m.my_value + m.unit : '暂无' }}</span>
+                <span class="bm-pct" :class="{ 'pct-good': (m.pct_of_target ?? 0) >= 100 }">{{ m.pct_of_target !== null ? m.pct_of_target + '%' : '—' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Task readiness table -->
       <div class="chart-card tasks-card">
         <div class="chart-header">
@@ -245,7 +293,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { dashboardApi, type DashboardOverview, type TrendPoint, type MemberStat, type TaskReadiness, type DashboardROI } from '@/api/dashboard'
+import { dashboardApi, type DashboardOverview, type TrendPoint, type MemberStat, type TaskReadiness, type DashboardROI, type DashboardBenchmark } from '@/api/dashboard'
 
 const loading = ref(true)
 const overview = ref<DashboardOverview | null>(null)
@@ -253,23 +301,26 @@ const trendData = ref<{ days: number; points: TrendPoint[] } | null>(null)
 const members = ref<MemberStat[]>([])
 const tasks = ref<TaskReadiness[]>([])
 const roi = ref<DashboardROI | null>(null)
+const benchmark = ref<DashboardBenchmark | null>(null)
 const trendDays = ref(30)
 const chartEl = ref<HTMLElement | null>(null)
 const chartW = ref(500)
 
 onMounted(async () => {
-  const [ovRes, trendRes, membersRes, tasksRes, roiRes] = await Promise.allSettled([
+  const [ovRes, trendRes, membersRes, tasksRes, roiRes, bmRes] = await Promise.allSettled([
     dashboardApi.getOverview(),
     dashboardApi.getTrend(trendDays.value),
     dashboardApi.getMembers(),
     dashboardApi.getTasks(),
     dashboardApi.getRoi(),
+    dashboardApi.getBenchmark(),
   ])
   if (ovRes.status === 'fulfilled') overview.value = ovRes.value.data
   if (trendRes.status === 'fulfilled') trendData.value = trendRes.value.data
   if (membersRes.status === 'fulfilled') members.value = membersRes.value.data
   if (tasksRes.status === 'fulfilled') tasks.value = tasksRes.value.data
   if (roiRes.status === 'fulfilled') roi.value = roiRes.value.data
+  if (bmRes.status === 'fulfilled') benchmark.value = bmRes.value.data
   loading.value = false
 
   await nextTick()
@@ -665,12 +716,59 @@ function formatRelative(iso: string) {
 .roi-label { font-size: 13px; font-weight: 600; color: #374151; margin-top: 4px; }
 .roi-sub { font-size: 11px; color: #9ca3af; }
 
+/* Benchmark panel */
+.benchmark-grid {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.bm-overall {
+  display: flex; flex-direction: column; align-items: center;
+  flex-shrink: 0;
+  position: relative;
+  width: 100px;
+}
+.bm-ring-svg { width: 80px; height: 80px; }
+.bm-overall-val {
+  font-size: 20px; font-weight: 800; color: #1a1a2e;
+  margin-top: 6px; text-align: center;
+}
+.bm-overall-label { font-size: 11px; color: #6b7280; text-align: center; }
+
+.bm-metrics { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.bm-metric { }
+.bm-metric-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 4px;
+}
+.bm-metric-label { font-size: 12px; font-weight: 600; color: #374151; }
+.bm-metric-target { font-size: 11px; color: #9ca3af; }
+.bm-bar-wrap {
+  height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden;
+  margin-bottom: 4px;
+}
+.bm-bar-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.6s ease;
+}
+.bar-good  { background: #22C55E; }
+.bar-ok    { background: #6366F1; }
+.bar-low   { background: #EF4444; }
+
+.bm-metric-vals {
+  display: flex; justify-content: space-between; align-items: center;
+}
+.bm-my-val { font-size: 11px; color: #6b7280; }
+.bm-pct { font-size: 11px; font-weight: 700; color: #6b7280; }
+.bm-pct.pct-good { color: #16a34a; }
+
 @media (max-width: 1024px) {
   .kpi-grid { grid-template-columns: repeat(3, 1fr); }
   .charts-row { grid-template-columns: 1fr; }
   .tasks-header, .tasks-row { grid-template-columns: 1fr 90px 70px 150px 50px; }
   .tc-count { display: none; }
   .roi-grid { grid-template-columns: repeat(2, 1fr); }
+  .benchmark-grid { flex-direction: column; }
 }
 @media (max-width: 640px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
