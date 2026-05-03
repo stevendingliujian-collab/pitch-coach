@@ -1,13 +1,18 @@
 <template>
-  <div class="rehearsal-page" :class="{ fullscreen: isFullscreen }">
+  <div class="rehearsal-page" :class="{ fullscreen: isFullscreen, 'is-recording': recorder.state.value === 'recording' }">
     <!-- Top bar -->
     <div class="top-bar">
       <div class="top-left">
         <el-button :icon="ArrowLeft" @click="goBack" size="small" text>返回</el-button>
         <span class="project-name">{{ taskName }}</span>
       </div>
-      <div class="timer" :class="{ recording: recorder.state.value === 'recording' }">
-        {{ formatTime(recorder.durationSec.value) }}
+      <div class="timer-area">
+        <span v-if="recorder.state.value === 'recording'" class="rec-badge">
+          <span class="recording-dot" style="width:6px;height:6px;margin:0" />REC
+        </span>
+        <div class="timer" :class="{ recording: recorder.state.value === 'recording' }">
+          {{ formatTime(recorder.durationSec.value) }}
+        </div>
       </div>
       <div class="top-right">
         <el-button :icon="FullScreen" @click="toggleFullscreen" size="small" text />
@@ -309,6 +314,10 @@ function importanceType(level: number): '' | 'success' | 'warning' | 'danger' | 
 .top-left { display: flex; align-items: center; gap: 12px; }
 .project-name { font-size: 14px; color: #a0aec0; }
 
+.timer-area {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+
 .timer {
   font-size: 32px;
   font-weight: 900;
@@ -484,5 +493,54 @@ function importanceType(level: number): '' | 'success' | 'warning' | 'danger' | 
   gap: 12px;
   font-size: 14px;
   color: #a0aec0;
+}
+
+/* ── Immersive recording state ──────────────────────────────────────── */
+/* Vignette overlay when recording */
+.rehearsal-page.is-recording::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.5) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Red accent stripe at top during recording */
+.rehearsal-page.is-recording .top-bar {
+  border-bottom-color: rgba(252, 129, 129, 0.4);
+  box-shadow: 0 1px 0 rgba(252, 129, 129, 0.2);
+}
+
+/* Pulse ring on the timer during recording */
+.rehearsal-page.is-recording .timer {
+  color: #fff;
+  text-shadow: 0 0 20px rgba(252, 129, 129, 0.6);
+}
+
+/* Slide glows slightly when recording */
+.rehearsal-page.is-recording .slide-img {
+  box-shadow: 0 4px 40px rgba(99, 102, 241, 0.25);
+}
+
+/* Recording bar glows red */
+.rehearsal-page.is-recording .recording-bar {
+  border-top-color: rgba(252, 129, 129, 0.3);
+  background: #1c1f2e;
+}
+
+/* REC badge */
+.rec-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(252, 129, 129, 0.12);
+  border: 1px solid rgba(252, 129, 129, 0.3);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fc8181;
+  letter-spacing: 0.5px;
 }
 </style>

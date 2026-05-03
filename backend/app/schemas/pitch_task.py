@@ -38,5 +38,10 @@ class PitchTaskResponse(BaseModel):
     status: int
     result: int | None
     owner_id: int
+    # Computed from rehearsal aggregates
+    rehearsal_count: int = 0
+    best_score: float | None = None
+    readiness_score: int = 0
+    created_at: date | None = None
 
     model_config = {"from_attributes": True}

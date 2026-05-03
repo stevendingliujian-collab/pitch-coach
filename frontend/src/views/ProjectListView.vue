@@ -237,12 +237,57 @@
       </Transition>
     </Teleport>
 
-    <el-dialog v-model="showImport" title="导入 PPT" width="440px">
-      <p style="color:var(--t-muted);font-size:14px">请先创建项目，然后在项目详情页上传 PPT 文件。</p>
-      <template #footer>
-        <el-button type="primary" @click="showImport = false; showCreate = true">创建项目</el-button>
-      </template>
-    </el-dialog>
+    <!-- Import PPT hint modal V2 -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showImport" class="modal-backdrop" @mousedown.self="showImport = false">
+          <div class="modal-card import-card">
+            <div class="modal-header">
+              <div class="modal-icon import-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="12" y1="18" x2="12" y2="12"/>
+                  <line x1="9" y1="15" x2="15" y2="15"/>
+                </svg>
+              </div>
+              <div>
+                <div class="modal-title">导入 PPT</div>
+                <div class="modal-subtitle">上传述标演示文稿</div>
+              </div>
+              <button class="modal-close" @click="showImport = false">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/>
+                </svg>
+              </button>
+            </div>
+            <div class="import-body">
+              <div class="import-step">
+                <div class="step-num">1</div>
+                <div>先创建项目（填写客户名、行业、述标日期）</div>
+              </div>
+              <div class="import-step">
+                <div class="step-num">2</div>
+                <div>进入项目详情页，点击「上传 PPT」上传文件</div>
+              </div>
+              <div class="import-step">
+                <div class="step-num">3</div>
+                <div>AI 自动解析并生成逐页讲解方案（约30秒）</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-v2" @click="showImport = false">取消</button>
+              <button class="btn-v2 btn-v2-primary" @click="showImport = false; showCreate = true">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/>
+                </svg>
+                创建项目
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -305,8 +350,9 @@ async function handleCreate() {
 }
 
 function readiness(task: PitchTask): number {
-  if ((task as any).readiness_score) return (task as any).readiness_score
-  // derive a rough score from rehearsal count
+  // Use real readiness_score from API (computed from rehearsal count + best score)
+  if (task.readiness_score != null) return task.readiness_score
+  // Fallback: derive from rehearsal count only
   const r = task.rehearsal_count ?? 0
   if (r === 0) return 0
   return Math.min(40 + r * 12, 98)
@@ -597,4 +643,23 @@ function daysLeftShort(bidDate: string): string {
   min-height: 180px; cursor: default;
 }
 @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* Import modal specific */
+.import-card { max-width: 420px; }
+.import-icon { background: rgba(16, 185, 129, 0.12); color: #10B981; }
+.import-body {
+  padding: 20px 24px 8px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.import-step {
+  display: flex; align-items: flex-start; gap: 12px;
+  font-size: 14px; color: var(--t-primary); line-height: 1.5;
+}
+.step-num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
 </style>
