@@ -5,7 +5,7 @@ import secrets
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from pydantic import BaseModel
 from typing import Optional
 
@@ -14,6 +14,7 @@ from app.core.security import get_current_user
 from app.models.team_invite import TeamInvite
 from app.models.user import User
 from app.models.tenant import Tenant
+from app.services.quota_service import increment_usage
 
 router = APIRouter(prefix="/team", tags=["team"])
 
@@ -143,11 +144,42 @@ async def join_team(
     current_user.tenant_id = invite.tenant_id
     current_user.role = invite.grant_role
 
-    # Increment usage
+    # Increment invite usage
     invite.used_count += 1
     await db.commit()
 
-    return {"message": "成功加入团队", "tenant_id": invite.tenant_id, "role": invite.grant_role}
+    # Referral reward: every 3 accepted invites → give the inviter 50 bonus narration pages
+    # We sum used_count across all invite codes created by this user
+    total_accepted_res = await db.execute(
+        select(func.sum(TeamInvite.used_count)).where(
+            TeamInvite.created_by == invite.created_by,
+            TeamInvite.tenant_id == invite.tenant_id,
+        )
+    )
+    total_accepted = total_accepted_res.scalar() or 0
+
+    bonus_granted = False
+    if total_accepted > 0 and total_accepted % 3 == 0:
+        # Fetch the creator to grant them the bonus
+        creator = await db.get(User, invite.created_by)
+        if creator:
+            # Grant -50 credit (effective 50 extra narration pages this month)
+            await increment_usage(
+                "narration_pages",
+                creator,
+                db,
+                delta=-50,
+                meta={"reason": "referral_bonus", "total_invited": total_accepted},
+            )
+            await db.commit()
+            bonus_granted = True
+
+    return {
+        "message": "成功加入团队",
+        "tenant_id": invite.tenant_id,
+        "role": invite.grant_role,
+        "referral_bonus_granted": bonus_granted,
+    }
 
 
 @router.delete("/invites/{invite_id}", status_code=204)
