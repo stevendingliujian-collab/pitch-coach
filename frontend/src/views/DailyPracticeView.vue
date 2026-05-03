@@ -18,6 +18,18 @@
       <el-skeleton :rows="6" animated />
     </div>
 
+    <!-- Upcoming pitch countdown banner -->
+    <div v-if="today?.upcoming_task" class="countdown-banner">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M8 1l1.5 3.5 3.5.5-2.5 2.5.6 3.5L8 9.5 4.9 11l.6-3.5L3 5l3.5-.5z"/>
+      </svg>
+      <span class="countdown-text">
+        距「{{ today.upcoming_task.name }}」述标还有
+        <strong class="countdown-days">{{ today.upcoming_task.days_left }}</strong> 天，保持每日练习！
+      </span>
+      <router-link :to="`/projects/${today.upcoming_task.task_id}`" class="countdown-link">查看详情 →</router-link>
+    </div>
+
     <!-- Main 2-col layout -->
     <div v-else-if="today" class="v2-content dp-layout">
 
@@ -477,6 +489,20 @@ function scoreRingColor(score: number) {
 
 <style scoped>
 .dp-page { background: var(--bg-content); }
+
+/* Countdown banner */
+.countdown-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+  border-bottom: 1px solid #F59E0B;
+  padding: 10px 24px; font-size: 13px; color: #78350F;
+}
+.countdown-days { font-size: 18px; font-weight: 800; color: #B45309; margin: 0 3px; }
+.countdown-link {
+  margin-left: auto; font-size: 12px; font-weight: 600;
+  color: #92400E; text-decoration: none;
+}
+.countdown-link:hover { text-decoration: underline; }
 
 .topbar-breadcrumb { font-size: 13px; color: var(--t-faint); margin-left: 4px; }
 

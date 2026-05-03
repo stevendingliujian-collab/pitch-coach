@@ -1,6 +1,13 @@
 import axios from 'axios'
 import { api } from './index'
 
+export interface UpcomingTask {
+  task_id: number
+  name: string
+  bid_date: string
+  days_left: number
+}
+
 export interface TodayPractice {
   item_id: number
   practice_type: string
@@ -12,6 +19,7 @@ export interface TodayPractice {
   status: number          // 0=未开始 1=已完成
   current_streak: number
   last_practice_date: string | null
+  upcoming_task: UpcomingTask | null
 }
 
 export interface StartPracticeResponse {

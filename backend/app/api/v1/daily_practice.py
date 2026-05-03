@@ -30,6 +30,13 @@ router = APIRouter(prefix="/daily-practice", tags=["daily-practice"])
 # Schemas
 # ---------------------------------------------------------------------------
 
+class UpcomingTask(BaseModel):
+    task_id: int
+    name: str
+    bid_date: date
+    days_left: int
+
+
 class TodayPracticeResponse(BaseModel):
     item_id: int
     practice_type: str
@@ -42,6 +49,8 @@ class TodayPracticeResponse(BaseModel):
     # Streak info
     current_streak: int = 0
     last_practice_date: Optional[date] = None
+    # Upcoming pitch within 14 days
+    upcoming_task: Optional[UpcomingTask] = None
 
 
 class StartPracticeResponse(BaseModel):
@@ -135,6 +144,27 @@ async def get_today_practice(
     # Streak
     streak = await _get_or_create_streak(current_user, db)
 
+    # Upcoming pitch within 14 days
+    from app.models.pitch_task import PitchTask
+    upcoming_task: UpcomingTask | None = None
+    deadline = today + timedelta(days=14)
+    upcoming_res = await db.execute(
+        select(PitchTask).where(
+            PitchTask.tenant_id == current_user.tenant_id,
+            PitchTask.status != 3,
+            PitchTask.bid_date >= today,
+            PitchTask.bid_date <= deadline,
+        ).order_by(PitchTask.bid_date.asc()).limit(1)
+    )
+    upcoming = upcoming_res.scalar_one_or_none()
+    if upcoming and upcoming.bid_date:
+        upcoming_task = UpcomingTask(
+            task_id=upcoming.id,
+            name=upcoming.name,
+            bid_date=upcoming.bid_date,
+            days_left=(upcoming.bid_date - today).days,
+        )
+
     return TodayPracticeResponse(
         item_id=item.id,
         practice_type=item.practice_type,
@@ -146,6 +176,7 @@ async def get_today_practice(
         status=log.status if log else 0,
         current_streak=streak.current_streak,
         last_practice_date=streak.last_practice_date,
+        upcoming_task=upcoming_task,
     )
 
 
