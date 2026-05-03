@@ -30,6 +30,8 @@ const router = createRouter({
     { path: '/billing', name: 'billing', component: () => import('@/views/BillingView.vue') },
     // P2 F6 Dashboard
     { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
+    // P3 F7 AI 复盘助手
+    { path: '/post-mortem', name: 'postMortem', component: () => import('@/views/PostMortemView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },

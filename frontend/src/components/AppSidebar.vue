@@ -89,6 +89,17 @@
           <span>评委模拟</span>
           <span class="nav-badge pro">专业版</span>
         </router-link>
+
+        <router-link to="/post-mortem" class="nav-item" :class="{ active: isActive('/post-mortem') }" data-label="AI 复盘助手">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+            <circle cx="10" cy="10" r="7.5"/>
+            <path d="M10 6.5v3.5l2.5 2.5"/>
+            <line x1="7" y1="3" x2="7" y2="1.5"/>
+            <line x1="13" y1="3" x2="13" y2="1.5"/>
+          </svg>
+          <span>AI 复盘助手</span>
+          <span class="nav-badge elite">旗舰版</span>
+        </router-link>
       </div>
 
       <div class="nav-section">

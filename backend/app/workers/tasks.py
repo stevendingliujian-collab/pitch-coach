@@ -644,3 +644,148 @@ async def _expire_trials():
         if expired:
             await db.commit()
             logger.info("Expired %d trials", len(expired))
+
+
+# ---------------------------------------------------------------------------
+# Post-Mortem analysis task (F7 AI 复盘助手)
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, base=DatabaseTask, name="app.workers.tasks.run_post_mortem_task",
+                 max_retries=1, default_retry_delay=10)
+def run_post_mortem_task(self, post_mortem_id: int):
+    asyncio.run(_run_post_mortem(self, post_mortem_id))
+
+
+async def _run_post_mortem(task: Task, post_mortem_id: int):
+    """
+    AI 复盘分析完整流程：
+    1. ASR 转录录音
+    2. 说话人分离（LLM 推断）
+    3. 评委问题提取 + 分类
+    4. 与排练预测对比（命中率）
+    5. 回答质量评估
+    6. 答疑函草拟
+    7. 关键时刻提取
+    8. 综合洞察生成
+    """
+    import logging
+    from app.core.storage import download_bytes
+    from app.core.ws_manager import publish_progress
+
+    logger = logging.getLogger(__name__)
+
+    async with _make_session()() as db:
+        from app.models.post_mortem import PostMortem
+        from app.models.pitch_task import PitchTask
+        from app.models.pitch_plan import PitchPlan
+        from app.services.asr_adapter import transcribe
+        from app.services.post_mortem_service import run_full_post_mortem
+
+        pm = await db.get(PostMortem, post_mortem_id)
+        if not pm:
+            return
+
+        async def progress(pct: int, stage: str):
+            await publish_progress(
+                redis_url=settings.redis_url,
+                tenant_id=pm.tenant_id,
+                entity_type="post_mortem",
+                entity_id=post_mortem_id,
+                progress=pct,
+                stage=stage,
+            )
+
+        try:
+            pm.status = "processing"
+            await db.commit()
+
+            await progress(5, "downloading_recording")
+
+            # 1. Download and transcribe
+            audio_bytes = download_bytes(pm.recording_url)
+            await progress(15, "transcribing")
+            segments = await transcribe(audio_bytes)
+            # Build full transcript text for LLM
+            transcript_text = " ".join(
+                seg.get("text", "") for seg in (segments or [])
+            ).strip()
+            if not transcript_text:
+                raise ValueError("Transcript is empty — ASR returned no text")
+
+            # 2. Get task info for context
+            pitch_task = await db.get(PitchTask, pm.pitch_task_id)
+            task_name = pitch_task.name if pitch_task else "述标项目"
+            customer_name = (pitch_task.customer_name or "") if pitch_task else ""
+
+            # 3. Get predicted questions from latest plan
+            predicted_questions: list[str] = []
+            try:
+                from sqlalchemy import select
+                from app.models.pitch_plan import PitchPlan
+                plan_result = await db.execute(
+                    select(PitchPlan)
+                    .where(
+                        PitchPlan.pitch_task_id == pm.pitch_task_id,
+                        PitchPlan.status == 1,
+                    )
+                    .order_by(PitchPlan.id.desc())
+                    .limit(1)
+                )
+                latest_plan = plan_result.scalar_one_or_none()
+                if latest_plan and latest_plan.predicted_questions:
+                    predicted_questions = latest_plan.predicted_questions or []
+            except Exception:
+                pass
+
+            # 4. Get knowledge base context (best-effort)
+            kb_context = ""
+            try:
+                from app.services.knowledge_service import hybrid_search
+                hits = await hybrid_search(
+                    query=task_name,
+                    tenant_id=pm.tenant_id,
+                    db=db,
+                    top_n=3,
+                )
+                if hits:
+                    kb_context = "\n".join(h.get("content", "") for h in hits[:3])
+            except Exception as kb_err:
+                logger.warning("KB search skipped: %s", kb_err)
+
+            await progress(30, "analyzing")
+
+            # 5. Run full analysis
+            result = await run_full_post_mortem(
+                transcript_text=transcript_text,
+                task_name=task_name,
+                customer_name=customer_name,
+                predicted_questions=predicted_questions,
+                kb_context=kb_context,
+            )
+
+            await progress(90, "saving")
+
+            # 6. Persist results
+            pm.diarization = result["diarization"]
+            pm.evaluator_questions = result["evaluator_questions"]
+            pm.our_talk_ratio = result["our_talk_ratio"]
+            pm.evaluator_count = result["evaluator_count"]
+            pm.question_count = result["question_count"]
+            pm.question_categories = result["question_categories"]
+            pm.prediction_hit_rate = result["prediction_hit_rate"]
+            pm.answer_assessments = result["answer_assessments"]
+            pm.followup_draft = result["followup_draft"]
+            pm.key_moments = result["key_moments"]
+            pm.insights = result["insights"]
+            pm.status = "completed"
+
+            await db.commit()
+            await progress(100, "done")
+
+        except Exception as exc:
+            pm.status = "failed"
+            pm.error_msg = str(exc)[:512]
+            await db.commit()
+            await progress(0, f"error: {str(exc)[:100]}")
+            logger.exception("Post-mortem task failed for id=%s", post_mortem_id)
+            raise task.retry(exc=exc)
