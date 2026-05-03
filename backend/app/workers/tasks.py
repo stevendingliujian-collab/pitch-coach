@@ -113,6 +113,17 @@ async def _generate_plan(task: Task, plan_id: int):
                 import logging
                 logging.getLogger(__name__).warning(f"Knowledge search skipped: {kb_err}")
 
+            # Choose model based on subscription tier (free → lite model to reduce cost)
+            from app.models.subscription import Subscription
+            sub_res = await db.execute(
+                select(Subscription).where(
+                    Subscription.tenant_id == plan.tenant_id,
+                    Subscription.status.in_(["trial", "active"]),
+                )
+            )
+            is_paid = sub_res.scalar_one_or_none() is not None
+            llm_model_to_use = settings.llm_model if is_paid else settings.llm_model_lite
+
             llm_result = await generate_pitch_plan(
                 project_name=pitch_task.name if pitch_task else plan.ppt_file_name,
                 customer_name=plan.customer_name or "",
@@ -124,6 +135,7 @@ async def _generate_plan(task: Task, plan_id: int):
                 pages=raw_pages,
                 knowledge_context=knowledge_context,
                 progress_callback=progress,
+                model=llm_model_to_use,
             )
 
             await progress(90, "saving_results")

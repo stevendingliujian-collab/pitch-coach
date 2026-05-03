@@ -165,11 +165,16 @@ async def call_llm(
     system: str = "你是一位专业的AI助手，按要求输出JSON格式内容。",
     max_tokens: int = 2000,
     temperature: float = 0.3,
+    model: str | None = None,
 ) -> str:
-    """Generic single-turn LLM call. Returns the raw text response."""
+    """Generic single-turn LLM call. Returns the raw text response.
+
+    Pass ``model`` explicitly to override the default (e.g. settings.llm_model_lite
+    for free-tier users to reduce inference cost).
+    """
     client = _get_client()
     resp = await client.chat.completions.create(
-        model=settings.llm_model,
+        model=model or settings.llm_model,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user_prompt},
@@ -199,11 +204,13 @@ async def generate_pitch_plan(
     person_names: list[str] | None = None,
     knowledge_context: list[dict] | None = None,
     progress_callback=None,
+    model: str | None = None,
 ) -> dict:
     """
-    Call DeepSeek to generate a structured pitch plan.
+    Call LLM to generate a structured pitch plan.
     Desensitizes PII before sending; restores it in the response.
     progress_callback(pct: int, stage: str) is called at key points.
+    Pass ``model`` to override the default (e.g. lite model for free-tier tenants).
     """
     ctx = DesensitizeContext()
     customer_names = [n for n in [customer_name] if n]
@@ -236,8 +243,9 @@ async def generate_pitch_plan(
     if progress_callback:
         await progress_callback(10, "sending_to_llm")
 
+    _model = model or settings.llm_model
     response = await _get_client().chat.completions.create(
-        model=settings.llm_model,
+        model=_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},

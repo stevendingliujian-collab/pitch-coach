@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://coding.dashscope.aliyuncs.com/v1"
     llm_model: str = "qwen3.6-plus"
+    llm_model_lite: str = "qwen-turbo"  # lightweight model for free-tier users
     llm_max_tokens: int = 8192
     llm_temperature: float = 0.3
     # Bypass proxy for domestic API endpoints
