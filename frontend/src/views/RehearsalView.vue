@@ -543,4 +543,14 @@ function importanceType(level: number): '' | 'success' | 'warning' | 'danger' | 
   color: #fc8181;
   letter-spacing: 0.5px;
 }
+
+/* ── Mobile responsive ──────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .hints-panel { display: none; }
+  .top-bar { padding: 8px 12px; }
+  .timer { font-size: 24px; }
+  .recording-bar { height: 70px; padding: 0 16px; }
+  .slide-area { padding: 12px; }
+  .project-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
 </style>

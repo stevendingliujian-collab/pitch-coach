@@ -787,4 +787,12 @@ function formatDate(iso: string) {
 .green { color: #22C55E; }
 .orange { color: #F97316; }
 .red { color: #EF4444; }
+
+/* ── Mobile ───────────────────────────────────────── */
+@media (max-width: 600px) {
+  .ev-messages { padding: 16px; }
+  .msg-bubble { max-width: 85%; font-size: 13px; }
+  .ev-input-area { padding: 10px 12px; }
+  .sc-config-row { flex-direction: column; gap: 8px; }
+}
 </style>

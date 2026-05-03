@@ -667,4 +667,17 @@ function scoreRingColor(score: number) {
 .history-bar.score-low  { background: var(--red); }
 .history-stats { font-size: 12px; color: var(--t-faint); text-align: center; }
 .history-stats strong { color: var(--t-primary); }
+
+/* ── Mobile responsive ───────────────────────────────────── */
+@media (max-width: 600px) {
+  .dp-view { padding: 16px; }
+  .dp-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .dp-header-actions { width: 100%; }
+  .rec-btn { width: 100%; justify-content: center; padding: 14px; font-size: 15px; border-radius: 12px; }
+  .rec-btn svg { width: 22px; height: 22px; }
+  .dp-exercise-card { padding: 16px; }
+  .ex-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .score-display { font-size: 56px; }
+  .feedback-grid { grid-template-columns: 1fr; }
+}
 </style>

@@ -7,6 +7,8 @@
         <router-view />
       </div>
     </div>
+    <!-- Mobile bottom navigation -->
+    <MobileBottomNav v-if="isLoggedIn && showSidebar" />
     <!-- Global overlays -->
     <OnboardingGuide v-if="isLoggedIn" />
     <TrialBanner v-if="isLoggedIn" />
@@ -18,6 +20,7 @@
 import { computed } from 'vue'
 import AppNavbar from '@/components/AppNavbar.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import MobileBottomNav from '@/components/MobileBottomNav.vue'
 import OnboardingGuide from '@/components/OnboardingGuide.vue'
 import TrialBanner from '@/components/TrialBanner.vue'
 import UpgradeBanner from '@/components/UpgradeBanner.vue'
@@ -154,5 +157,9 @@ body {
 @media (max-width: 600px) {
   .stat-grid { grid-template-columns: 1fr; }
   :root { --sidebar-w: 0px; }
+  /* Hide desktop sidebar, show bottom nav instead */
+  .main-layout aside { display: none !important; }
+  /* Add bottom padding so content isn't hidden under bottom nav */
+  .content-area { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0)); }
 }
 </style>

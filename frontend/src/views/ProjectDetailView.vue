@@ -170,4 +170,15 @@ function exportPlan() {
 
 /* Tab content */
 .pd-tab-content { min-height: calc(100vh - 104px); }
+
+/* ── Mobile ─────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .pd-topbar { padding: 0 12px; gap: 6px; }
+  .pd-project-name { max-width: 120px; font-size: 13px; }
+  .pd-back-btn span { display: none; }
+  .pd-tab { padding: 9px 10px; font-size: 12px; gap: 4px; }
+  .pd-tab-icon svg { display: none; }
+  /* Hide export btn on mobile */
+  .pd-topbar .btn-v2-ghost { display: none; }
+}
 </style>

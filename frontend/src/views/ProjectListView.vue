@@ -629,6 +629,18 @@ function daysLeftShort(bidDate: string): string {
 .spin-icon { width: 14px; height: 14px; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── Mobile ─────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .v2-content { padding: 16px; }
+  .page-header { padding: 16px; }
+  .page-header h1 { font-size: 20px; }
+  .new-task-btn span:last-child { display: none; }
+  .project-grid { grid-template-columns: 1fr; }
+  .filter-bar { overflow-x: auto; scrollbar-width: none; gap: 6px; flex-wrap: nowrap; }
+  .filter-bar::-webkit-scrollbar { display: none; }
+  .search-box { display: none; }
+}
+
 /* Modal transition */
 .modal-enter-active, .modal-leave-active { transition: opacity 0.18s ease; }
 .modal-enter-active .modal-card, .modal-leave-active .modal-card { transition: transform 0.18s ease, opacity 0.18s ease; }
