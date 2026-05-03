@@ -686,11 +686,16 @@ async def _expire_trials():
             )
         )
         expired = result.scalars().all()
+        from app.models.tenant import Tenant
         for sub in expired:
             sub.status = "expired"
             sub.plan_type = "free"
             sub.updated_at = now
             logger.info("Trial expired — tenant_id=%s", sub.tenant_id)
+            # Sync tenant.plan_type
+            tenant = await db.get(Tenant, sub.tenant_id)
+            if tenant:
+                tenant.plan_type = "free"
         if expired:
             await db.commit()
             logger.info("Expired %d trials", len(expired))

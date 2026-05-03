@@ -30,6 +30,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.security import decode_token
 from app.models.user import User
 from app.models.tenant import Tenant
+from app.models.subscription import Subscription
 from app.services.quota_service import check_quota, FEATURE_LABELS, get_gated_routes
 from sqlalchemy import select
 
@@ -77,9 +78,19 @@ class FeatureGateMiddleware(BaseHTTPMiddleware):
             if not user_row:
                 return await call_next(request)
 
-            # Determine plan type from tenant
-            tenant_row = await db.get(Tenant, tenant_id)
-            plan_type = getattr(tenant_row, "plan_type", "free") if tenant_row else "free"
+            # Determine plan type from subscription (authoritative) or tenant fallback
+            sub_result = await db.execute(
+                select(Subscription).where(Subscription.tenant_id == tenant_id)
+            )
+            sub_row = sub_result.scalar_one_or_none()
+            if sub_row and sub_row.is_active:
+                plan_type = sub_row.plan_type or "pro"
+            else:
+                tenant_row = await db.get(Tenant, tenant_id)
+                plan_type = getattr(tenant_row, "plan_type", "free") if tenant_row else "free"
+                # Treat tenant-level plan that isn't "free" as still active (legacy)
+                if plan_type == "free":
+                    plan_type = "free"
 
             allowed, used, limit = await check_quota(
                 feature, user_row, db, plan_type=plan_type

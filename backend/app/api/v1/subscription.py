@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.subscription import Subscription
+from app.models.tenant import Tenant
 
 router = APIRouter(prefix="/subscription", tags=["subscription"])
 
@@ -62,6 +63,12 @@ async def start_trial(
     sub.trial_starts_at = now
     sub.trial_ends_at = now + timedelta(days=TRIAL_DAYS)
     sub.updated_at = now
+
+    # Keep tenant.plan_type in sync
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if tenant:
+        tenant.plan_type = "pro"
+
     await db.commit()
     await db.refresh(sub)
     return _serialize(sub)

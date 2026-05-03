@@ -20,6 +20,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.models.subscription import Subscription
+from app.models.tenant import Tenant
 from app.models.payment import Payment
 from app.services.billing_service import (
     PLANS,
@@ -181,6 +182,11 @@ async def upgrade_subscription(
     # Activate subscription
     sub = await _get_or_create_sub(current_user.tenant_id, db)
     sub = await activate_subscription(db, sub, body.plan_type, body.billing_cycle)
+
+    # Sync plan_type to the tenant row so middleware can read it quickly
+    tenant = await db.get(Tenant, current_user.tenant_id)
+    if tenant:
+        tenant.plan_type = body.plan_type
 
     await db.commit()
     await db.refresh(payment)
