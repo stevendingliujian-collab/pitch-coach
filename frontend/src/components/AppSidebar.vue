@@ -101,6 +101,15 @@
           </svg>
           <span>升级套餐</span>
         </router-link>
+
+        <router-link to="/billing" class="nav-item" :class="{ active: isActive('/billing') }" data-label="账单管理">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+            <rect x="2" y="4" width="16" height="12" rx="2"/>
+            <line x1="2" y1="8" x2="18" y2="8"/>
+            <rect x="5" y="11" width="4" height="2" rx="0.5"/>
+          </svg>
+          <span>账单管理</span>
+        </router-link>
       </div>
 
       <!-- Expand button shown only when collapsed -->

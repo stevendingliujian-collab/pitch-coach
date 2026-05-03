@@ -26,6 +26,8 @@ const router = createRouter({
     { path: '/pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
     // P2 F4 Evaluator simulation
     { path: '/evaluator', name: 'evaluator', component: () => import('@/views/EvaluatorView.vue') },
+    // P2 Billing
+    { path: '/billing', name: 'billing', component: () => import('@/views/BillingView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },
