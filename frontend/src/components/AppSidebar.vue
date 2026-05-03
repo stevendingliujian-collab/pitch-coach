@@ -1,5 +1,5 @@
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ collapsed }">
     <!-- Brand -->
     <div class="sidebar-brand">
       <div class="brand-icon">
@@ -11,6 +11,12 @@
         <span class="brand-name">述标教练</span>
         <span class="brand-sub">OTD AI · PITCH COACH</span>
       </div>
+      <button class="collapse-btn" @click="toggleCollapse" :title="collapsed ? '展开菜单' : '收起菜单'">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline v-if="!collapsed" points="10 3 5 8 10 13"/>
+          <polyline v-else points="6 3 11 8 6 13"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Nav -->
@@ -18,7 +24,7 @@
       <div class="nav-section">
         <div class="nav-section-label">工作台</div>
 
-        <router-link to="/projects" class="nav-item" :class="{ active: isActive('/projects') }">
+        <router-link to="/projects" class="nav-item" :class="{ active: isActive('/projects') }" data-label="我的项目">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
             <rect x="2" y="3" width="7" height="8" rx="1.5"/>
             <rect x="11" y="3" width="7" height="4" rx="1.5"/>
@@ -28,7 +34,7 @@
           <span>我的项目</span>
         </router-link>
 
-        <router-link to="/daily-practice" class="nav-item" :class="{ active: isActive('/daily-practice') }">
+        <router-link to="/daily-practice" class="nav-item" :class="{ active: isActive('/daily-practice') }" data-label="每日微练习">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
             <circle cx="10" cy="10" r="7.5"/>
             <polyline points="10 6.5 10 10 12.5 12.5"/>
@@ -41,7 +47,7 @@
       <div class="nav-section">
         <div class="nav-section-label">资产库</div>
 
-        <router-link to="/knowledge" class="nav-item" :class="{ active: isActive('/knowledge') }">
+        <router-link to="/knowledge" class="nav-item" :class="{ active: isActive('/knowledge') }" data-label="知识库">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
             <rect x="3" y="2" width="14" height="16" rx="1.5"/>
             <line x1="7" y1="7" x2="13" y2="7"/>
@@ -51,7 +57,7 @@
           <span>知识库</span>
         </router-link>
 
-        <div class="nav-item disabled">
+        <div class="nav-item disabled" data-label="话术宝典（专业版）">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
             <polygon points="10 2 12.4 7.5 18.5 8.2 14 12.4 15.3 18.5 10 15.6 4.7 18.5 6 12.4 1.5 8.2 7.6 7.5"/>
           </svg>
@@ -63,7 +69,7 @@
       <div class="nav-section">
         <div class="nav-section-label">分析</div>
 
-        <div class="nav-item disabled">
+        <div class="nav-item disabled" data-label="进步看板（专业版）">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
             <polyline points="2 14 7 9 11 13 18 5"/>
             <line x1="18" y1="5" x2="18" y2="9"/>
@@ -72,6 +78,13 @@
           <span>进步看板</span>
           <span class="nav-badge pro">专业版</span>
         </div>
+      </div>
+
+      <!-- Expand button shown only when collapsed -->
+      <div v-if="collapsed" class="nav-item expand-btn" @click="toggleCollapse" title="展开菜单">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 3 11 8 6 13"/>
+        </svg>
       </div>
     </nav>
 
@@ -107,13 +120,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+
+const collapsed = ref(localStorage.getItem('sidebar-collapsed') === 'true')
+
+function toggleCollapse() {
+  collapsed.value = !collapsed.value
+}
+
+function applySidebarWidth(v: boolean) {
+  document.documentElement.style.setProperty('--sidebar-w', v ? '56px' : '220px')
+}
+
+watch(collapsed, (v) => {
+  localStorage.setItem('sidebar-collapsed', String(v))
+  applySidebarWidth(v)
+})
+
+onMounted(() => applySidebarWidth(collapsed.value))
 
 function isActive(path: string) {
   return route.path === path || route.path.startsWith(path + '/')
@@ -154,7 +184,22 @@ function handleLogout() {
   overflow: hidden;
   position: sticky;
   top: 0;
+  transition: width 0.22s ease;
 }
+
+/* ── Collapse button ────────────────────────────── */
+.collapse-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 24px; height: 24px;
+  border-radius: 6px; border: none;
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.35);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+}
+.collapse-btn:hover { background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7); }
+.collapse-btn svg { width: 12px; height: 12px; }
 
 /* ── Brand ──────────────────────────────────────── */
 .sidebar-brand {
@@ -284,4 +329,58 @@ function handleLogout() {
 }
 .user-settings:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.7); }
 .user-settings svg { width: 14px; height: 14px; }
+
+/* ── Collapsed state ────────────────────────────── */
+.sidebar.collapsed .brand-text,
+.sidebar.collapsed .nav-section-label,
+.sidebar.collapsed .nav-item > span,
+.sidebar.collapsed .nav-badge,
+.sidebar.collapsed .sidebar-usage,
+.sidebar.collapsed .user-info,
+.sidebar.collapsed .collapse-btn {
+  display: none;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  padding: 16px 12px;
+  justify-content: center;
+  gap: 0;
+}
+
+.sidebar.collapsed .sidebar-nav {
+  padding: 8px 6px 0;
+}
+
+.sidebar.collapsed .nav-item {
+  padding: 9px;
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-user {
+  justify-content: center;
+  gap: 0;
+  padding: 10px 12px 14px;
+}
+
+/* Tooltip on hover when collapsed */
+.sidebar.collapsed .nav-item[data-label] {
+  position: relative;
+}
+.sidebar.collapsed .nav-item[data-label]:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15,15,19,0.95);
+  color: rgba(255,255,255,0.9);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 200;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,0.08);
+}
 </style>

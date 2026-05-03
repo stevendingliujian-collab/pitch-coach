@@ -12,8 +12,8 @@
         </el-select>
 
         <span class="label">语速：</span>
-        <el-slider v-model="speed" :min="0.75" :max="1.5" :step="0.25" :marks="speedMarks"
-          style="width: 160px; margin: 0 16px" size="small" />
+        <el-slider v-model="speed" :min="0.75" :max="1.5" :step="0.25"
+          style="width: 140px" size="small" />
         <span class="speed-val">{{ speed }}x</span>
 
         <el-button type="primary" size="small" :loading="isActivelyGenerating" :disabled="isActivelyGenerating"
@@ -304,16 +304,46 @@ onUnmounted(() => { ws?.close() })
 </script>
 
 <style scoped>
-.narration-tab { display: flex; flex-direction: column; gap: 16px; }
+/* Tab wrapper — normal flow, header shows at top */
+.narration-tab {
+  display: flex;
+  flex-direction: column;
+}
 
-.narration-header { background: #f5f7fa; border-radius: 8px; padding: 16px; }
-.narration-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.label { font-size: 13px; color: #606266; white-space: nowrap; }
-.speed-val { font-size: 13px; min-width: 36px; }
+/* Sticky controls bar */
+.narration-header {
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+}
+.narration-controls {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.label { font-size: 13px; color: var(--t-muted); white-space: nowrap; }
+.speed-val {
+  font-size: 13px; font-weight: 600; min-width: 32px;
+  color: var(--accent);
+}
 
-.narration-layout { display: grid; grid-template-columns: 160px 1fr; gap: 16px; }
+/* Two-column layout — fixed height so columns scroll independently */
+/* topbar(52) + tab-nav(44) + narration-header(~64) = 160px */
+.narration-layout {
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  height: calc(100vh - 160px);
+}
 
-.thumb-strip { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 70vh; }
+.thumb-strip {
+  width: 160px;
+  flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 8px;
+  overflow-y: auto;
+  height: 100%;
+  padding: 16px 12px;
+  border-right: 1px solid var(--border);
+}
 .thumb-item { cursor: pointer; border: 2px solid transparent; border-radius: 6px; padding: 4px;
   position: relative; transition: border-color .2s; }
 .thumb-item.active { border-color: #409eff; background: #ecf5ff; }
@@ -324,7 +354,17 @@ onUnmounted(() => { ws?.close() })
 .thumb-num { font-size: 11px; color: #909399; text-align: center; }
 .thumb-dur { display: block; text-align: center; margin-top: 2px; }
 
-.narration-main { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; max-height: 70vh; }
+.narration-main {
+  flex: 1;
+  display: flex; flex-direction: column; gap: 16px;
+  overflow-y: auto;
+  height: 100%;
+  padding: 20px 24px;
+}
+/* Prevent flex-shrink from compressing children — let overflow-y: auto scroll instead */
+.narration-main > * {
+  flex-shrink: 0;
+}
 
 .full-player { background: #f5f7fa; border-radius: 8px; padding: 16px; }
 .player-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
@@ -336,8 +376,23 @@ onUnmounted(() => { ws?.close() })
 .page-label { font-weight: 600; }
 .script-text { font-size: 14px; line-height: 1.8; color: #303133; white-space: pre-wrap; }
 
-.all-scripts { border-top: 1px solid #eee; }
-.script-item { border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
-.script-item-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.script-body { font-size: 13px; color: #606266; line-height: 1.7; margin: 0; }
+.all-scripts { border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+/* Override Element Plus collapse content padding */
+.all-scripts :deep(.el-collapse-item__header) {
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--t-primary);
+  background: var(--bg-content);
+}
+.all-scripts :deep(.el-collapse-item__content) {
+  padding: 0;
+}
+.script-item {
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+}
+.script-item:last-child { border-bottom: none; }
+.script-item-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.script-body { font-size: 13px; color: var(--t-muted); line-height: 1.8; margin: 0; }
 </style>

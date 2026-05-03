@@ -443,7 +443,7 @@ const dimLabel = (k: string) => DIM_LABELS[k] ?? k
 </script>
 
 <style scoped>
-.training-tab { padding: 8px 0; display: flex; flex-direction: column; gap: 16px; }
+.training-tab { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 
 /* Plan header */
 .plan-header { background:#f5f7fa; border-radius:8px; padding:12px 16px; }

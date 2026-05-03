@@ -314,6 +314,7 @@ function importanceTagType(level: number) {
 .gen-stage { margin-top: 16px; font-size: 15px; color: #409eff; font-weight: 500; }
 .gen-hint { color: #909399; font-size: 13px; margin-top: 8px; }
 
+.plan-layout { padding: 20px 24px; }
 .plan-header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
 .plan-actions { margin-left: auto; display: flex; gap: 8px; }
 
@@ -364,9 +365,18 @@ function importanceTagType(level: number) {
 .q-text { font-weight: 600; color: #303133; font-size: 14px; margin-bottom: 6px; }
 .a-text { color: #606266; font-size: 13px; line-height: 1.6; margin: 0; }
 
-.split-layout { display: flex; gap: 0; border: 1px solid #e4e7ed; border-radius: 8px; overflow: hidden; }
+.split-layout {
+  display: flex; gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  height: calc(100vh - 250px); /* topbar 52 + tab-nav 44 + plan-header 60 + padding 40 + buffer 54 */
+}
 
-.slide-list { width: 180px; border-right: 1px solid #e4e7ed; background: #fafafa; overflow-y: auto; max-height: 680px; }
+.slide-list {
+  width: 180px; border-right: 1px solid var(--border);
+  background: var(--bg-content); overflow-y: auto; height: 100%;
+}
 .slide-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background 0.15s; }
 .slide-item.active { background: #ecf5ff; }
 .slide-item:hover:not(.active) { background: #f5f7fa; }
@@ -376,7 +386,7 @@ function importanceTagType(level: number) {
 .slide-info { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
 .slide-num { font-size: 12px; color: #909399; }
 
-.page-detail { flex: 1; padding: 20px; overflow-y: auto; max-height: 680px; }
+.page-detail { flex: 1; padding: 20px; overflow-y: auto; height: 100%; }
 .page-detail-header { margin-bottom: 16px; }
 .page-detail-header h3 { font-size: 16px; font-weight: 600; color: #303133; margin-bottom: 8px; }
 .page-meta { display: flex; align-items: center; gap: 8px; }

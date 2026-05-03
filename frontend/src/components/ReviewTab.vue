@@ -356,7 +356,7 @@ onMounted(loadRehearsals)
 </script>
 
 <style scoped>
-.review-tab { display: flex; flex-direction: column; gap: 16px; }
+.review-tab { display: flex; flex-direction: column; gap: 16px; padding: 20px 24px; }
 .review-header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px; background: #f5f7fa; border-radius: 8px; }
 .label { font-size: 13px; color: #606266; }
 

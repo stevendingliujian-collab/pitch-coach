@@ -154,47 +154,88 @@
       </div>
     </div>
 
-    <!-- Create project dialog -->
-    <el-dialog v-model="showCreate" title="新建项目" width="520px">
-      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-position="top">
-        <el-form-item label="项目名称" prop="name">
-          <el-input v-model="createForm.name" placeholder="如：苏州XX公司 MES 项目" />
-        </el-form-item>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="客户名称">
-              <el-input v-model="createForm.customer_name" placeholder="客户公司名称" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="客户行业">
-              <el-select v-model="createForm.customer_industry" placeholder="选择行业">
-                <el-option v-for="i in INDUSTRIES" :key="i" :label="i" :value="i" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="述标日期">
-              <el-date-picker v-model="createForm.bid_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="述标时长（分钟）">
-              <el-input-number v-model="createForm.bid_time_limit" :min="5" :max="120" style="width:100%" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-form-item label="招标要求摘要（选填）">
-          <el-input v-model="createForm.bid_requirements" type="textarea" :rows="3" placeholder="粘贴评分标准、技术要求等" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreate = false">取消</el-button>
-        <el-button type="primary" :loading="creating" @click="handleCreate">创建</el-button>
-      </template>
-    </el-dialog>
+    <!-- Create project dialog — custom styled -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showCreate" class="modal-backdrop" @mousedown.self="showCreate = false">
+          <div class="modal-card">
+            <!-- Header -->
+            <div class="modal-header">
+              <div class="modal-header-left">
+                <div class="modal-icon">
+                  <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <rect x="2" y="3" width="7" height="8" rx="1.5"/>
+                    <rect x="11" y="3" width="7" height="4" rx="1.5"/>
+                    <rect x="11" y="9" width="7" height="8" rx="1.5"/>
+                    <rect x="2" y="13" width="7" height="4" rx="1.5"/>
+                  </svg>
+                </div>
+                <div>
+                  <div class="modal-title">新建项目</div>
+                  <div class="modal-subtitle">填写述标项目基本信息</div>
+                </div>
+              </div>
+              <button class="modal-close" @click="showCreate = false">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body">
+              <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-position="top" class="v2-form">
+                <el-form-item label="项目名称" prop="name" class="v2-form-item required">
+                  <el-input v-model="createForm.name" placeholder="如：苏州XX公司 MES 系统项目" class="v2-input" />
+                </el-form-item>
+
+                <div class="form-row">
+                  <el-form-item label="客户名称" class="v2-form-item">
+                    <el-input v-model="createForm.customer_name" placeholder="客户公司名称" class="v2-input" />
+                  </el-form-item>
+                  <el-form-item label="客户行业" class="v2-form-item">
+                    <el-select v-model="createForm.customer_industry" placeholder="选择行业" class="v2-select">
+                      <el-option v-for="i in INDUSTRIES" :key="i" :label="i" :value="i" />
+                    </el-select>
+                  </el-form-item>
+                </div>
+
+                <div class="form-row">
+                  <el-form-item label="述标日期" class="v2-form-item">
+                    <el-date-picker v-model="createForm.bid_date" type="date" value-format="YYYY-MM-DD"
+                      placeholder="选择日期" style="width:100%" class="v2-input" />
+                  </el-form-item>
+                  <el-form-item label="述标时长（分钟）" class="v2-form-item">
+                    <el-input-number v-model="createForm.bid_time_limit" :min="5" :max="120"
+                      style="width:100%" class="v2-input" />
+                  </el-form-item>
+                </div>
+
+                <el-form-item class="v2-form-item">
+                  <template #label>
+                    <span>招标要求摘要</span>
+                    <span class="optional-tag">选填</span>
+                  </template>
+                  <el-input v-model="createForm.bid_requirements" type="textarea" :rows="3"
+                    placeholder="粘贴评分标准、技术要求、注意事项等，AI 生成方案时会参考" class="v2-input" />
+                </el-form-item>
+              </el-form>
+            </div>
+
+            <!-- Footer -->
+            <div class="modal-footer">
+              <button class="modal-btn-cancel" @click="showCreate = false">取消</button>
+              <button class="modal-btn-primary" :disabled="creating" @click="handleCreate">
+                <svg v-if="creating" class="spin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+                </svg>
+                {{ creating ? '创建中…' : '创建项目' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <el-dialog v-model="showImport" title="导入 PPT" width="440px">
       <p style="color:var(--t-muted);font-size:14px">请先创建项目，然后在项目详情页上传 PPT 文件。</p>
@@ -407,6 +448,146 @@ function daysLeftShort(bidDate: string): string {
 .empty-icon  { margin-bottom: 12px; color: var(--t-faint); }
 .empty-text  { font-size: 16px; font-weight: 600; color: var(--t-secondary); margin-bottom: 6px; }
 .empty-sub   { font-size: 13px; color: var(--t-faint); }
+
+/* ── Custom modal ────────────────────────────────── */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 2000;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.modal-card {
+  width: 520px;
+  background: var(--bg-card);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header */
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 24px 18px;
+  border-bottom: 1px solid var(--border-light);
+}
+.modal-header-left { display: flex; align-items: center; gap: 12px; }
+.modal-icon {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--accent-dim);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.modal-icon svg { width: 18px; height: 18px; }
+.modal-title { font-size: 16px; font-weight: 700; color: var(--t-primary); line-height: 1.2; }
+.modal-subtitle { font-size: 12px; color: var(--t-faint); margin-top: 2px; }
+.modal-close {
+  width: 28px; height: 28px; border-radius: 7px; border: none;
+  background: transparent; color: var(--t-faint);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s;
+}
+.modal-close:hover { background: var(--bg-content); color: var(--t-primary); }
+.modal-close svg { width: 14px; height: 14px; }
+
+/* Body */
+.modal-body { padding: 20px 24px; }
+
+.form-row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+}
+
+/* Override Element Plus form label */
+.v2-form :deep(.el-form-item__label) {
+  font-size: 12px; font-weight: 600;
+  color: var(--t-secondary);
+  letter-spacing: 0.1px;
+  padding-bottom: 5px;
+  line-height: 1.4;
+}
+.v2-form :deep(.el-form-item) {
+  margin-bottom: 14px;
+}
+.v2-form :deep(.el-input__wrapper),
+.v2-form :deep(.el-textarea__inner) {
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--border);
+  transition: box-shadow 0.15s;
+}
+.v2-form :deep(.el-input__wrapper:hover),
+.v2-form :deep(.el-textarea__inner:hover) {
+  box-shadow: 0 0 0 1px #9CA3AF;
+}
+.v2-form :deep(.el-input__wrapper.is-focus),
+.v2-form :deep(.el-textarea__inner:focus) {
+  box-shadow: 0 0 0 2px var(--accent) !important;
+}
+.v2-form :deep(.el-select .el-input__wrapper) {
+  border-radius: 8px;
+}
+.v2-form :deep(.el-input-number .el-input__wrapper) {
+  border-radius: 8px;
+}
+.v2-form :deep(.el-date-editor .el-input__wrapper) {
+  border-radius: 8px;
+}
+.v2-form :deep(.el-textarea__inner) {
+  font-family: inherit;
+  font-size: 13px;
+  resize: none;
+  padding: 8px 12px;
+}
+.v2-form :deep(.el-input__inner) {
+  font-size: 13px;
+}
+
+.optional-tag {
+  display: inline-block;
+  margin-left: 6px; padding: 1px 6px;
+  background: var(--bg-content);
+  border-radius: 4px;
+  font-size: 10px; font-weight: 600;
+  color: var(--t-faint);
+  letter-spacing: 0.2px;
+  vertical-align: middle;
+}
+
+/* Footer */
+.modal-footer {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  padding: 14px 24px 20px;
+  border-top: 1px solid var(--border-light);
+}
+.modal-btn-cancel {
+  height: 36px; padding: 0 18px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-card); color: var(--t-secondary);
+  font-size: 13px; font-weight: 500; font-family: inherit;
+  cursor: pointer; transition: all 0.15s;
+}
+.modal-btn-cancel:hover { background: var(--bg-content); border-color: #9CA3AF; }
+.modal-btn-primary {
+  height: 36px; padding: 0 20px;
+  border-radius: 8px; border: none;
+  background: var(--accent); color: #fff;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.modal-btn-primary:hover { background: #4F46E5; }
+.modal-btn-primary:disabled { opacity: 0.7; cursor: not-allowed; }
+
+/* Spinner */
+.spin-icon { width: 14px; height: 14px; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Modal transition */
+.modal-enter-active, .modal-leave-active { transition: opacity 0.18s ease; }
+.modal-enter-active .modal-card, .modal-leave-active .modal-card { transition: transform 0.18s ease, opacity 0.18s ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-from .modal-card, .modal-leave-to .modal-card { transform: translateY(12px) scale(0.97); opacity: 0; }
 
 /* Skeleton */
 .skeleton {
