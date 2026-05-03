@@ -166,12 +166,17 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { subscriptionApi } from '@/api/subscription'
+import { useAbTest } from '@/composables/useAbTest'
 
 const router = useRouter()
 const annual = ref(false)
 const loading = ref(false)
 const activating = ref<string | null>(null)
 const currentPlan = ref<string>('free')
+
+// A/B test: pricing_layout
+const { getVariant, recordConversion, recordEvent } = useAbTest()
+const pricingVariant = ref<string>('control')
 
 onMounted(async () => {
   try {
@@ -184,6 +189,13 @@ onMounted(async () => {
     }
   } catch {
     // ignore — user may not be logged in
+  }
+
+  // Enroll in pricing layout A/B test
+  const v = await getVariant('pricing_layout')
+  if (v) {
+    pricingVariant.value = v
+    recordEvent('pricing_layout', 'page_view')
   }
 })
 
@@ -382,6 +394,9 @@ async function handleCta(plan: any) {
   // For pro / elite — start trial
   loading.value = true
   activating.value = plan.id
+  // Record A/B test conversion
+  recordConversion('pricing_layout', { plan: plan.id })
+  recordConversion('upgrade_cta_copy', { plan: plan.id })
   try {
     await subscriptionApi.startTrial()
     currentPlan.value = plan.id

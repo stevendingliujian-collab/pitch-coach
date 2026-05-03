@@ -38,6 +38,8 @@ const router = createRouter({
     { path: '/achievements', name: 'achievements', component: () => import('@/views/GamificationView.vue') },
     // P4 Golden Scripts (金牌话术库)
     { path: '/golden-scripts', name: 'goldenScripts', component: () => import('@/views/GoldenScriptsView.vue') },
+    // P4 A/B Test dashboard
+    { path: '/ab-tests', name: 'abTests', component: () => import('@/views/AbTestView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },

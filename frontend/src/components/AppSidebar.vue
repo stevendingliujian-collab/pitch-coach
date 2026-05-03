@@ -120,6 +120,14 @@
           </svg>
           <span>游戏化成就</span>
         </router-link>
+
+        <router-link to="/ab-tests" class="nav-item" :class="{ active: isActive('/ab-tests') }" data-label="A/B 测试">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+            <path d="M3 4h6v12H3zM11 4h6v12h-6z"/>
+            <path d="M6 10h8"/>
+          </svg>
+          <span>A/B 测试</span>
+        </router-link>
       </div>
 
       <div class="nav-section">
