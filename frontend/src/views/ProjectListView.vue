@@ -118,7 +118,8 @@ async function handleCreate() {
   await createFormRef.value?.validate()
   creating.value = true
   try {
-    const res = await pitchTaskApi.create(createForm.value)
+    const payload = { ...createForm.value, bid_date: createForm.value.bid_date || null }
+    const res = await pitchTaskApi.create(payload)
     tasks.value.unshift(res.data)
     showCreate.value = false
     router.push(`/projects/${res.data.id}`)

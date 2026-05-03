@@ -32,7 +32,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     await db.refresh(user)
 
-    token = create_access_token({"sub": user.id, "tenant_id": tenant.id, "role": user.role})
+    token = create_access_token({"sub": str(user.id), "tenant_id": tenant.id, "role": user.role})
     return TokenResponse(
         access_token=token,
         user_id=user.id,
@@ -49,7 +49,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user or not user.password_hash or not verify_password(body.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_access_token({"sub": user.id, "tenant_id": user.tenant_id, "role": user.role})
+    token = create_access_token({"sub": str(user.id), "tenant_id": user.tenant_id, "role": user.role})
     return TokenResponse(
         access_token=token,
         user_id=user.id,
