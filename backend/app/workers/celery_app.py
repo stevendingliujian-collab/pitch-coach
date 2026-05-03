@@ -35,6 +35,11 @@ celery_app.conf.update(
             "task": "app.workers.tasks.bid_deadline_warning_task",
             "schedule": crontab(minute=0),  # every hour
         },
+        # Expire trials that have passed their end date (runs every hour)
+        "expire-trials": {
+            "task": "app.workers.tasks.expire_trials_task",
+            "schedule": crontab(minute=0),  # every hour
+        },
     },
 )
 

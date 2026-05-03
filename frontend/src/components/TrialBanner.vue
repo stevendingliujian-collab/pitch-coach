@@ -11,7 +11,9 @@
           <div class="trial-countdown" v-if="hoursLeft > 0">
             剩余 <strong>{{ hoursLeft }}</strong> 小时
           </div>
-          <button class="trial-cta" @click="activateTrial">立即体验</button>
+          <button class="trial-cta" :disabled="activating" @click="activateTrial">
+            {{ activating ? '激活中…' : '立即体验' }}
+          </button>
           <button class="trial-close" @click="dismiss" aria-label="关闭">✕</button>
         </div>
       </div>
@@ -22,6 +24,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { subscriptionApi } from '@/api/subscription'
 import { ElMessage } from 'element-plus'
 
 const STORAGE_KEY = 'pc_trial_banner_dismissed'
@@ -29,6 +32,7 @@ const TRIAL_WINDOW_HOURS = 72  // show within first 72h after registration
 
 const auth = useAuthStore()
 const visible = ref(false)
+const activating = ref(false)
 
 const hoursLeft = computed(() => {
   if (!auth.user?.created_at) return 0
@@ -43,14 +47,18 @@ function dismiss() {
   localStorage.setItem(STORAGE_KEY, '1')
 }
 
-function activateTrial() {
-  // P2: connect to billing API. For now show message.
-  ElMessage({
-    message: '专业版试用功能将在 P2 版本正式上线，敬请期待！',
-    type: 'info',
-    duration: 3000,
-  })
-  dismiss()
+async function activateTrial() {
+  activating.value = true
+  try {
+    await subscriptionApi.startTrial()
+    ElMessage.success('🎉 7天专业版试用已激活！享受完整功能吧～')
+    dismiss()
+  } catch (e: any) {
+    const msg = e.response?.data?.detail || '激活失败，请稍后再试'
+    ElMessage.error(msg)
+  } finally {
+    activating.value = false
+  }
 }
 
 onMounted(async () => {
@@ -58,7 +66,7 @@ onMounted(async () => {
   // Ensure user profile is loaded
   if (!auth.user) await auth.fetchMe()
   if (!auth.user?.created_at) return
-  // Only show if within 72h window
+  // Only show if within 72h window and user hasn't started trial
   if (hoursLeft.value > 0) {
     setTimeout(() => { visible.value = true }, 2000)
   }

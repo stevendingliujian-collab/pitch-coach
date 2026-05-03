@@ -603,3 +603,44 @@ async def _bid_deadline_warning():
                 row.id, row.name, row.bid_date, row.tenant_id,
             )
         # TODO P2: push notification via 企微/飞书/钉钉 webhook
+
+
+# ---------------------------------------------------------------------------
+# Trial expiry (Celery Beat — every hour)
+# ---------------------------------------------------------------------------
+
+@celery_app.task(name="app.workers.tasks.expire_trials_task")
+def expire_trials_task():
+    asyncio.run(_expire_trials())
+
+
+async def _expire_trials():
+    """
+    Find subscription rows in 'trial' status whose trial_ends_at has passed,
+    and downgrade them back to 'free'.
+    """
+    import logging
+    from datetime import datetime
+
+    logger = logging.getLogger(__name__)
+
+    async with _make_session()() as db:
+        from sqlalchemy import select, text
+        from app.models.subscription import Subscription
+
+        now = datetime.utcnow()
+        result = await db.execute(
+            select(Subscription).where(
+                Subscription.status == "trial",
+                Subscription.trial_ends_at <= now,
+            )
+        )
+        expired = result.scalars().all()
+        for sub in expired:
+            sub.status = "expired"
+            sub.plan_type = "free"
+            sub.updated_at = now
+            logger.info("Trial expired — tenant_id=%s", sub.tenant_id)
+        if expired:
+            await db.commit()
+            logger.info("Expired %d trials", len(expired))
