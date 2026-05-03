@@ -13,7 +13,8 @@ export function useAppMode() {
 
   return {
     isEmbedded,
-    showNavbar: showChrome,
+    // Navbar is hidden — sidebar handles branding + user info
+    showNavbar: computed(() => false),
     showSidebar: showChrome,
     containerClass: computed(() => isEmbedded.value ? 'embedded-container' : 'standalone-container'),
   }

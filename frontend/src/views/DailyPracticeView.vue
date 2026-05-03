@@ -1,175 +1,265 @@
 <template>
-  <div class="dp-page">
-    <!-- Header -->
-    <div class="dp-header">
-      <div class="dp-header-left">
-        <el-button :icon="ArrowLeft" text @click="router.push('/projects')">返回</el-button>
-        <span class="dp-title">每日微练习</span>
-      </div>
-      <div class="dp-streak" v-if="streakInfo">
-        <span class="streak-flame">🔥</span>
-        <span class="streak-num">{{ streakInfo.current_streak }}</span>
-        <span class="streak-label">天连续</span>
-      </div>
+  <div class="v2-page dp-page">
+    <!-- Topbar -->
+    <div class="v2-topbar">
+      <span class="v2-topbar-title">每日微练习</span>
+      <span class="topbar-breadcrumb">/ {{ weekdayLabel }} · {{ typeLabelStr }}</span>
+      <div class="v2-topbar-flex" />
+      <button class="btn-v2 btn-v2-ghost" @click="showHistory = !showHistory">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="7" cy="7" r="5.5"/><polyline points="7 4 7 7 9 9"/>
+        </svg>
+        历史记录
+      </button>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="dp-loading">
-      <el-skeleton :rows="5" animated />
+    <div v-if="loading" class="v2-content">
+      <el-skeleton :rows="6" animated />
     </div>
 
-    <!-- Main content -->
-    <div v-else-if="today" class="dp-content">
+    <!-- Main 2-col layout -->
+    <div v-else-if="today" class="v2-content dp-layout">
 
-      <!-- Practice card -->
-      <div class="practice-card" :class="{ 'is-done': today.status === 1 && recState !== 'scored' }">
-        <div class="practice-meta">
-          <el-tag :type="typeTagType(today.practice_type)" size="small" round>
-            {{ typeLabel(today.practice_type) }}
-          </el-tag>
-          <span class="practice-weekday">{{ weekdayLabel }}</span>
-          <el-tag v-if="today.status === 1 && recState !== 'scored'" type="success" size="small">✓ 今日已完成</el-tag>
+      <!-- ── Left: Exercise card ── -->
+      <div class="dp-main">
+        <div class="dp-exercise-card v2-card">
+          <!-- Card header: type badge + weekday + target -->
+          <div class="ex-header">
+            <div class="ex-tags">
+              <span class="ex-type-badge" :class="`type-${today.practice_type}`">{{ typeLabel(today.practice_type) }}</span>
+              <span class="ex-weekday">{{ weekdayLabel }}</span>
+              <span v-if="today.status === 1 && recState !== 'scored'" class="ex-done-badge">✓ 今日已完成</span>
+            </div>
+            <div class="ex-target-pill">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="6" cy="6" r="4.5"/><polyline points="6 3.5 6 6 7.5 7.5"/>
+              </svg>
+              目标 {{ today.target_duration_sec }} 秒
+            </div>
+          </div>
+
+          <h2 class="ex-title">{{ today.title }}</h2>
+
+          <div class="ex-instruction">
+            <pre class="ex-instruction-text">{{ today.instruction }}</pre>
+          </div>
+
+          <!-- Key points tags -->
+          <div v-if="today.key_points.length" class="ex-keypoints">
+            <span class="ex-kp-label">评分关键点</span>
+            <div class="ex-kp-tags">
+              <span v-for="kp in today.key_points" :key="kp" class="ex-kp-tag">{{ kp }}</span>
+            </div>
+          </div>
+
+          <!-- Scoring meta footer -->
+          <div class="ex-meta-footer">
+            <span class="ex-meta-item">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
+                <polyline points="2 9 5 6 8 8 10.5 3"/>
+              </svg>
+              评分 3 维度
+            </span>
+            <span class="ex-meta-item">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
+                <polygon points="6 1 7.5 4.5 11.5 4.8 8.5 7.5 9.5 11.5 6 9.3 2.5 11.5 3.5 7.5 0.5 4.8 4.5 4.5"/>
+              </svg>
+              满分 100
+            </span>
+          </div>
         </div>
 
-        <h2 class="practice-title">{{ today.title }}</h2>
+        <!-- ── Recording panel ── -->
+        <div class="dp-record-panel v2-card">
 
-        <div class="practice-instruction">
-          <pre class="instruction-text">{{ today.instruction }}</pre>
-        </div>
+          <!-- IDLE -->
+          <template v-if="recState === 'idle'">
+            <button
+              class="record-btn"
+              :class="{ 'record-btn-redo': today.status === 1 }"
+              :disabled="starting"
+              @click="startRecording"
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="8" y="2" width="6" height="12" rx="3"/>
+                <path d="M4 11c0 3.866 3.134 7 7 7s7-3.134 7-7"/>
+                <line x1="11" y1="18" x2="11" y2="21"/><line x1="7" y1="21" x2="15" y2="21"/>
+              </svg>
+              {{ today.status === 1 ? '再练一次' : '开始录音' }}
+            </button>
+            <p class="record-hint">点击后自动计时 · AI 完成后即时评分</p>
+          </template>
 
-        <div class="practice-target">
-          <el-icon><Timer /></el-icon>
-          目标时长：<strong>{{ today.target_duration_sec }} 秒</strong>
-        </div>
+          <!-- RECORDING -->
+          <template v-else-if="recState === 'recording'">
+            <div class="rec-active">
+              <div class="rec-header">
+                <div class="rec-dot-blink" />
+                <span class="rec-label">正在录音</span>
+              </div>
+              <div class="rec-timer">{{ formatTime(elapsed) }}</div>
+              <div class="rec-progress-track">
+                <div
+                  class="rec-progress-fill"
+                  :style="{ width: Math.min((elapsed / today.target_duration_sec) * 100, 100) + '%' }"
+                  :class="{ overshoot: elapsed > today.target_duration_sec }"
+                />
+              </div>
+              <div class="rec-progress-label">
+                目标 {{ today.target_duration_sec }}s
+                <span v-if="elapsed > today.target_duration_sec" class="rec-overshoot">
+                  已超 {{ elapsed - today.target_duration_sec }}s
+                </span>
+              </div>
+              <button class="stop-btn" :disabled="stopping" @click="stopAndScore">
+                <svg width="16" height="16" viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor"/></svg>
+                完成录音
+              </button>
+            </div>
+          </template>
 
-        <div v-if="today.key_points.length" class="key-points">
-          <span class="key-points-label">评分关键点：</span>
-          <el-tag
-            v-for="kp in today.key_points"
-            :key="kp"
-            size="small"
-            effect="plain"
-            class="kp-tag"
-          >{{ kp }}</el-tag>
+          <!-- UPLOADING -->
+          <template v-else-if="recState === 'uploading'">
+            <div class="uploading-state">
+              <div class="upload-spinner" />
+              <div class="upload-text">上传并评分中…</div>
+              <div class="upload-bar-track">
+                <div class="upload-bar-fill" :style="{ width: uploadPct + '%' }" />
+              </div>
+              <div class="upload-pct">{{ uploadPct }}%</div>
+            </div>
+          </template>
+
+          <!-- SCORED -->
+          <template v-else-if="recState === 'scored' && scoreResult">
+            <div class="score-reveal">
+              <div class="score-ring" :class="scoreClass(scoreResult.total_score)">
+                <svg width="88" height="88" viewBox="0 0 88 88">
+                  <circle cx="44" cy="44" r="36" fill="none" stroke="#E5E7EB" stroke-width="5"/>
+                  <circle
+                    cx="44" cy="44" r="36"
+                    fill="none"
+                    :stroke="scoreRingColor(scoreResult.total_score)"
+                    stroke-width="5"
+                    stroke-linecap="round"
+                    :stroke-dasharray="`${2 * Math.PI * 36}`"
+                    :stroke-dashoffset="`${2 * Math.PI * 36 * (1 - scoreResult.total_score / 100)}`"
+                    transform="rotate(-90 44 44)"
+                    style="transition: stroke-dashoffset 0.8s ease;"
+                  />
+                </svg>
+                <div class="score-ring-inner">
+                  <span class="score-big">{{ scoreResult.total_score.toFixed(0) }}</span>
+                  <span class="score-unit">分</span>
+                </div>
+              </div>
+
+              <div class="score-dims">
+                <div class="score-dim">
+                  <span class="dim-label">时长</span>
+                  <span class="dim-val">{{ scoreResult.timing_sec }}s / {{ today.target_duration_sec }}s</span>
+                </div>
+                <div class="score-dim">
+                  <span class="dim-label">填充词</span>
+                  <span class="dim-val">{{ scoreResult.filler_count }} 次</span>
+                </div>
+                <div class="score-dim">
+                  <span class="dim-label">关键点</span>
+                  <span class="dim-val">{{ Math.round(scoreResult.keyword_hit_rate * 100) }}%</span>
+                </div>
+              </div>
+
+              <div v-if="scoreResult.feedback?.length" class="score-feedback">
+                <div v-for="(f, i) in scoreResult.feedback" :key="i" class="feedback-line">{{ f }}</div>
+              </div>
+
+              <div v-if="scoreResult.current_streak > 0" class="streak-celebrate">
+                🔥 连续练习 {{ scoreResult.current_streak }} 天
+                <span v-if="scoreResult.is_new_record" class="new-record">新纪录！</span>
+              </div>
+
+              <el-collapse v-if="scoreResult.reference_answer" class="ref-collapse">
+                <el-collapse-item name="ref">
+                  <template #title><span class="ref-title">📖 参考答案</span></template>
+                  <div class="ref-content">{{ scoreResult.reference_answer }}</div>
+                </el-collapse-item>
+              </el-collapse>
+
+              <button class="btn-v2 btn-v2-ghost" style="width:100%;justify-content:center;margin-top:4px" @click="resetForRedo">
+                再练一次
+              </button>
+            </div>
+          </template>
+
         </div>
       </div>
 
-      <!-- Recording panel -->
-      <div class="recording-panel">
+      <!-- ── Right: Streak + Plan + History ── -->
+      <div class="dp-aside">
 
-        <!-- idle -->
-        <template v-if="recState === 'idle'">
-          <el-button
-            type="primary"
-            :icon="Microphone"
-            round
-            size="large"
-            :loading="starting"
-            @click="startRecording"
-          >
-            {{ today.status === 1 ? '再练一次' : '开始录音' }}
-          </el-button>
-          <p class="record-hint">点击开始，系统将自动计时并在完成后评分</p>
-        </template>
+        <!-- Streak card -->
+        <div class="aside-card v2-card">
+          <div class="streak-top">
+            <div class="streak-num">{{ streakInfo?.current_streak ?? 0 }}</div>
+            <span class="streak-fire">🔥</span>
+          </div>
+          <div class="streak-sub">天连续练习</div>
+          <!-- Week dots -->
+          <div class="week-dots">
+            <span
+              v-for="(d, i) in weekDots"
+              :key="i"
+              class="week-dot"
+              :class="{ done: d.done, today: d.isToday }"
+              :title="d.label"
+            />
+          </div>
+          <div class="week-labels">
+            <span v-for="l in ['一','二','三','四','五','六','日']" :key="l">{{ l }}</span>
+          </div>
+        </div>
 
-        <!-- recording -->
-        <template v-else-if="recState === 'recording'">
-          <div class="recording-active">
-            <div class="rec-pulse" />
-            <div class="rec-timer">{{ formatTime(elapsed) }}</div>
-            <div class="rec-target-bar">
+        <!-- Weekly plan -->
+        <div class="aside-card v2-card">
+          <div class="aside-card-title">本周练习计划</div>
+          <div class="weekly-plan">
+            <div
+              v-for="(item, i) in weeklyPlan"
+              :key="i"
+              class="weekly-item"
+              :class="{ active: item.isToday }"
+            >
+              <span class="weekly-dot" :class="`dot-${item.type}`" />
+              <span class="weekly-name">{{ item.name }}</span>
+              <span v-if="item.isToday" class="weekly-today-badge">← 今天</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- History score bars -->
+        <div v-if="history.length" class="aside-card v2-card">
+          <div class="aside-card-title">近 {{ history.length }} 次得分</div>
+          <div class="history-bars">
+            <div
+              v-for="(item, i) in history.slice().reverse()"
+              :key="i"
+              class="history-bar-wrap"
+              :title="`${item.practice_date} · ${item.total_score?.toFixed(0) ?? '--'}分`"
+            >
               <div
-                class="rec-target-fill"
-                :style="{ width: Math.min((elapsed / today.target_duration_sec) * 100, 100) + '%' }"
-                :class="{ overshoot: elapsed > today.target_duration_sec }"
+                class="history-bar"
+                :style="{ height: (item.total_score ?? 0) * 0.52 + 'px' }"
+                :class="scoreClass(item.total_score ?? 0)"
               />
             </div>
-            <div class="rec-target-label">
-              目标 {{ today.target_duration_sec }}s
-              <span v-if="elapsed > today.target_duration_sec" class="overshoot-text">
-                已超 {{ elapsed - today.target_duration_sec }}s
-              </span>
-            </div>
-            <el-button type="danger" round :loading="stopping" @click="stopAndScore">
-              完成录音
-            </el-button>
           </div>
-        </template>
-
-        <!-- uploading -->
-        <template v-else-if="recState === 'uploading'">
-          <div class="uploading-state">
-            <el-progress type="circle" :percentage="uploadPct" :width="80" />
-            <p>上传并评分中…</p>
-          </div>
-        </template>
-
-        <!-- scored -->
-        <template v-else-if="recState === 'scored' && scoreResult">
-          <div class="score-panel">
-            <div class="score-circle" :class="scoreClass(scoreResult.total_score)">
-              <span class="score-num">{{ scoreResult.total_score.toFixed(0) }}</span>
-              <span class="score-unit">分</span>
-            </div>
-
-            <div class="score-dims">
-              <div class="dim-item">
-                <span class="dim-icon">⏱</span>
-                <span>{{ scoreResult.timing_sec }}s / 目标{{ today.target_duration_sec }}s</span>
-              </div>
-              <div class="dim-item">
-                <span class="dim-icon">🗣</span>
-                <span>填充词 {{ scoreResult.filler_count }} 次</span>
-              </div>
-              <div class="dim-item">
-                <span class="dim-icon">✅</span>
-                <span>关键点覆盖 {{ Math.round(scoreResult.keyword_hit_rate * 100) }}%</span>
-              </div>
-            </div>
-
-            <div class="feedback-list">
-              <div v-for="(f, i) in scoreResult.feedback" :key="i" class="feedback-item">
-                {{ f }}
-              </div>
-            </div>
-
-            <div v-if="scoreResult.current_streak > 0" class="streak-badge" :class="{ 'new-record': scoreResult.is_new_record }">
-              <span>🔥 连续练习 {{ scoreResult.current_streak }} 天</span>
-              <span v-if="scoreResult.is_new_record" class="new-record-badge">新纪录！</span>
-            </div>
-
-            <el-collapse v-if="scoreResult.reference_answer" class="ref-answer">
-              <el-collapse-item name="ref">
-                <template #title>
-                  <span class="ref-title">📖 参考答案</span>
-                </template>
-                <div class="ref-content">{{ scoreResult.reference_answer }}</div>
-              </el-collapse-item>
-            </el-collapse>
-
-            <el-button class="redo-btn" round @click="resetForRedo">再练一次</el-button>
-          </div>
-        </template>
-
-      </div>
-
-      <!-- History mini-strip -->
-      <div class="history-strip" v-if="history.length">
-        <h3 class="history-title">最近 {{ history.length }} 次练习</h3>
-        <div class="history-list">
-          <div
-            v-for="item in history"
-            :key="item.log_id"
-            class="history-dot"
-            :class="item.total_score !== null ? scoreClass(item.total_score) : 'score-mid'"
-            :title="`${item.practice_date} ${item.title} ${item.total_score?.toFixed(0) ?? '--'}分`"
-          >
-            <span class="dot-date">{{ item.practice_date.slice(5) }}</span>
-            <span class="dot-score">{{ item.total_score?.toFixed(0) ?? '–' }}</span>
+          <div class="history-stats">
+            平均 <strong>{{ avgScore }}</strong> 分 · 最高 <strong>{{ maxScore }}</strong> 分
           </div>
         </div>
-      </div>
 
+      </div>
     </div>
   </div>
 </template>
@@ -177,7 +267,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Microphone, Timer } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
   dailyPracticeApi,
@@ -189,12 +278,13 @@ import {
 
 const router = useRouter()
 
-// ─── state ───────────────────────────────────────────────────────────────────
-const loading    = ref(true)
-const today      = ref<TodayPractice | null>(null)
-const streakInfo = ref<StreakInfo | null>(null)
-const history    = ref<PracticeHistoryItem[]>([])
-const scoreResult= ref<PracticeScoreResponse | null>(null)
+// ─── state ─────────────────────────────────────────────────────────
+const loading     = ref(true)
+const today       = ref<TodayPractice | null>(null)
+const streakInfo  = ref<StreakInfo | null>(null)
+const history     = ref<PracticeHistoryItem[]>([])
+const scoreResult = ref<PracticeScoreResponse | null>(null)
+const showHistory = ref(false)
 
 type RecState = 'idle' | 'recording' | 'uploading' | 'scored'
 const recState  = ref<RecState>('idle')
@@ -203,7 +293,6 @@ const stopping  = ref(false)
 const uploadPct = ref(0)
 const elapsed   = ref(0)
 
-// ─── recording internals ─────────────────────────────────────────────────────
 let mediaRecorder: MediaRecorder | null = null
 let audioChunks: Blob[] = []
 let currentLogId = 0
@@ -211,7 +300,7 @@ let currentObjectKey = ''
 let currentUploadUrl = ''
 let timerHandle: ReturnType<typeof setInterval> | null = null
 
-// ─── lifecycle ────────────────────────────────────────────────────────────────
+// ─── lifecycle ────────────────────────────────────────────────────
 onMounted(async () => {
   try {
     const [todayRes, histRes, streakRes] = await Promise.all([
@@ -237,32 +326,64 @@ onUnmounted(() => {
   }
 })
 
-// ─── computed ─────────────────────────────────────────────────────────────────
+// ─── computed ─────────────────────────────────────────────────────
 const weekdayLabel = computed(() => {
   const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
   const d = new Date().getDay()
   return days[d === 0 ? 6 : d - 1]
 })
 
-// ─── methods ──────────────────────────────────────────────────────────────────
+const typeLabelStr = computed(() => today.value ? typeLabel(today.value.practice_type) : '')
+
+const weeklyPlan = computed(() => {
+  const dow = new Date().getDay()
+  const todayIdx = dow === 0 ? 6 : dow - 1
+  return [
+    { name: '周一 · 口播开场', type: 'intro', isToday: todayIdx === 0 },
+    { name: '周二 · 案例讲解', type: 'case',  isToday: todayIdx === 1 },
+    { name: '周三 · 技术术语', type: 'term',  isToday: todayIdx === 2 },
+    { name: '周四 · 质疑回应', type: 'qa',    isToday: todayIdx === 3 },
+    { name: '周五 · 竞品对比', type: 'comp',  isToday: todayIdx === 4 },
+    { name: '周末 · 综合复习', type: 'rev',   isToday: todayIdx >= 5 },
+  ]
+})
+
+const weekDots = computed(() => {
+  const dow = new Date().getDay()
+  const todayIdx = dow === 0 ? 6 : dow - 1
+  return Array.from({ length: 7 }, (_, i) => ({
+    label: ['一','二','三','四','五','六','日'][i],
+    done: i < todayIdx || (i === todayIdx && today.value?.status === 1),
+    isToday: i === todayIdx,
+  }))
+})
+
+const avgScore = computed(() => {
+  const scores = history.value.filter(h => h.total_score !== null).map(h => h.total_score!)
+  if (!scores.length) return 0
+  return Math.round(scores.reduce((s, v) => s + v, 0) / scores.length)
+})
+const maxScore = computed(() => {
+  const scores = history.value.filter(h => h.total_score !== null).map(h => h.total_score!)
+  return scores.length ? Math.round(Math.max(...scores)) : 0
+})
+
+// ─── recording methods ────────────────────────────────────────────
 async function startRecording() {
   if (!today.value) return
   starting.value = true
   try {
-    // Get presigned URL
     const res = await dailyPracticeApi.start(today.value.item_id)
-    currentLogId      = res.data.log_id
-    currentObjectKey  = res.data.object_key
-    currentUploadUrl  = res.data.upload_url
+    currentLogId     = res.data.log_id
+    currentObjectKey = res.data.object_key
+    currentUploadUrl = res.data.upload_url
 
-    // Access microphone
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
     mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
     audioChunks = []
     mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data) }
     mediaRecorder.start(200)
 
-    // Start timer
     elapsed.value = 0
     timerHandle = setInterval(() => { elapsed.value++ }, 1000)
     recState.value = 'recording'
@@ -277,11 +398,9 @@ async function stopAndScore() {
   if (!mediaRecorder) return
   stopping.value = true
   stopTimer()
-
   const durationSec = elapsed.value
 
   try {
-    // Stop recorder
     await new Promise<void>((resolve) => {
       mediaRecorder!.onstop = () => resolve()
       mediaRecorder!.stop()
@@ -292,15 +411,9 @@ async function stopAndScore() {
     recState.value = 'uploading'
     uploadPct.value = 0
 
-    // Upload to MinIO / OSS
-    await dailyPracticeApi.uploadAudio(
-      currentUploadUrl,
-      audioBlob,
-      (pct) => { uploadPct.value = Math.min(pct, 90) },
-    )
+    await dailyPracticeApi.uploadAudio(currentUploadUrl, audioBlob, (pct) => { uploadPct.value = Math.min(pct, 90) })
     uploadPct.value = 95
 
-    // Submit to backend for scoring
     const completeRes = await dailyPracticeApi.complete({
       log_id: currentLogId,
       object_key: currentObjectKey,
@@ -319,7 +432,6 @@ async function stopAndScore() {
     if (today.value) today.value.status = 1
     recState.value = 'scored'
 
-    // Refresh history
     const histRes = await dailyPracticeApi.getHistory(10)
     history.value = histRes.data
   } catch (err: any) {
@@ -347,17 +459,7 @@ function formatTime(sec: number) {
 }
 
 function typeLabel(type: string) {
-  return ({
-    intro: '公司介绍', case: '案例讲解', term: '术语解释',
-    qa: '评委问答', competitive: '竞品话术', review: '综合复习',
-  } as Record<string, string>)[type] ?? type
-}
-
-function typeTagType(type: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
-  return ({
-    intro: 'primary', case: 'success', term: 'info',
-    qa: 'warning', competitive: 'danger', review: 'info',
-  } as Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'>)[type] ?? 'info'
+  return ({ intro: '口播开场', case: '案例讲解', term: '术语解释', qa: '质疑回应', competitive: '竞品话术', review: '综合复习' } as Record<string, string>)[type] ?? type
 }
 
 function scoreClass(score: number) {
@@ -365,251 +467,204 @@ function scoreClass(score: number) {
   if (score >= 70) return 'score-mid'
   return 'score-low'
 }
+
+function scoreRingColor(score: number) {
+  if (score >= 85) return '#22C55E'
+  if (score >= 70) return '#F59E0B'
+  return '#EF4444'
+}
 </script>
 
 <style scoped>
-.dp-page {
-  min-height: 100vh;
-  background: #f4f6fa;
-}
+.dp-page { background: var(--bg-content); }
 
-/* ── Header ── */
-.dp-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 24px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ef;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-.dp-header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.dp-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a1a2e;
-}
-.dp-streak {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: #fff7e6;
-  border: 1px solid #ffd591;
-  border-radius: 20px;
-  padding: 4px 14px;
-}
-.streak-flame { font-size: 18px; }
-.streak-num   { font-size: 22px; font-weight: 800; color: #fa8c16; line-height: 1; }
-.streak-label { font-size: 13px; color: #ad6800; }
+.topbar-breadcrumb { font-size: 13px; color: var(--t-faint); margin-left: 4px; }
 
-/* ── Loading ── */
-.dp-loading { max-width: 640px; margin: 40px auto; padding: 0 20px; }
-
-/* ── Layout ── */
-.dp-content {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
+/* 2-col layout */
+.dp-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
   gap: 20px;
+  align-items: start;
+}
+@media (max-width: 860px) { .dp-layout { grid-template-columns: 1fr; } }
+
+/* Exercise card */
+.dp-exercise-card { padding: 24px; margin-bottom: 16px; }
+.ex-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+.ex-tags   { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.ex-type-badge {
+  padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+}
+.type-intro { background: rgba(99,102,241,0.1); color: #6366F1; }
+.type-case  { background: rgba(34,197,94,0.1);  color: #16A34A; }
+.type-term  { background: rgba(6,182,212,0.1);   color: #0891B2; }
+.type-qa    { background: rgba(245,158,11,0.1);  color: #D97706; }
+.type-competitive { background: rgba(239,68,68,0.1); color: #DC2626; }
+.type-review { background: rgba(107,114,128,0.1); color: #4B5563; }
+
+.ex-weekday { font-size: 12px; color: var(--t-faint); }
+.ex-done-badge { font-size: 11px; font-weight: 600; color: var(--green); background: rgba(34,197,94,0.1); padding: 2px 8px; border-radius: 10px; }
+.ex-target-pill {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600; color: var(--t-muted);
+  background: var(--bg-content); border: 1px solid var(--border);
+  padding: 3px 10px; border-radius: 20px; flex-shrink: 0;
 }
 
-/* ── Practice card ── */
-.practice-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 24px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.06);
-  border: 2px solid transparent;
-  transition: border-color .2s;
-}
-.practice-card.is-done { border-color: #67c23a; }
+.ex-title { font-size: 20px; font-weight: 800; color: var(--t-primary); margin-bottom: 14px; line-height: 1.3; }
 
-.practice-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+.ex-instruction {
+  background: var(--bg-content); border-radius: var(--radius-md);
+  padding: 14px 16px; margin-bottom: 16px;
 }
-.practice-weekday { font-size: 13px; color: #909399; }
-.practice-title   { font-size: 20px; font-weight: 700; color: #1a1a2e; margin: 0 0 16px; }
-
-.practice-instruction {
-  background: #f8f9ff;
-  border-radius: 10px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-.instruction-text {
-  font-family: inherit;
-  font-size: 14px;
-  line-height: 1.8;
-  color: #4a4a6a;
-  white-space: pre-wrap;
-  margin: 0;
+.ex-instruction-text {
+  font-family: inherit; font-size: 13.5px; line-height: 1.85;
+  color: var(--t-secondary); white-space: pre-wrap; margin: 0;
 }
 
-.practice-target {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: #606266;
-  margin-bottom: 14px;
+.ex-keypoints { margin-bottom: 14px; }
+.ex-kp-label { font-size: 12px; font-weight: 600; color: var(--t-muted); margin-bottom: 6px; display: block; }
+.ex-kp-tags  { display: flex; flex-wrap: wrap; gap: 6px; }
+.ex-kp-tag   {
+  padding: 4px 12px; border-radius: 20px; font-size: 12px;
+  background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-light); font-weight: 600;
 }
 
-.key-points { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.key-points-label { font-size: 13px; color: #909399; }
-.kp-tag { border-radius: 12px !important; }
-
-/* ── Recording panel ── */
-.recording-panel {
-  background: #fff;
-  border-radius: 16px;
-  padding: 32px 24px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.06);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
+.ex-meta-footer {
+  display: flex; gap: 16px; padding-top: 14px; border-top: 1px solid var(--border-light);
 }
-.record-hint { font-size: 13px; color: #909399; text-align: center; margin: 0; }
-
-.recording-active {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  width: 100%;
+.ex-meta-item {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--t-faint);
 }
 
-.rec-pulse {
-  width: 20px; height: 20px;
-  border-radius: 50%;
-  background: #f56c6c;
-  animation: pulse 1s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%       { transform: scale(1.4); opacity: .7; }
-}
+/* Record panel */
+.dp-record-panel { padding: 28px 24px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 
-.rec-timer {
-  font-size: 48px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: #1a1a2e;
-  line-height: 1;
-}
-
-.rec-target-bar {
-  width: 100%;
-  height: 8px;
-  background: #e4e7ef;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.rec-target-fill {
-  height: 100%;
-  background: #409eff;
-  border-radius: 4px;
-  transition: width .5s linear;
-}
-.rec-target-fill.overshoot { background: #f56c6c; }
-
-.rec-target-label { font-size: 13px; color: #909399; }
-.overshoot-text   { color: #f56c6c; font-weight: 600; }
-
-.uploading-state {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 12px; color: #606266; font-size: 14px;
-}
-
-/* ── Score panel ── */
-.score-panel {
-  width: 100%;
-  display: flex; flex-direction: column; align-items: center; gap: 20px;
-}
-
-.score-circle {
-  width: 100px; height: 100px;
-  border-radius: 50%;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  border: 4px solid;
-}
-.score-circle.score-high { border-color: #67c23a; background: #f0f9eb; }
-.score-circle.score-mid  { border-color: #e6a23c; background: #fdf6ec; }
-.score-circle.score-low  { border-color: #f56c6c; background: #fef0f0; }
-
-.score-num  { font-size: 32px; font-weight: 800; line-height: 1; }
-.score-unit { font-size: 12px; color: #909399; }
-.score-circle.score-high .score-num { color: #67c23a; }
-.score-circle.score-mid  .score-num { color: #e6a23c; }
-.score-circle.score-low  .score-num { color: #f56c6c; }
-
-.score-dims { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-.dim-item {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 13px; color: #606266;
-  background: #f4f6fa; padding: 6px 12px; border-radius: 20px;
-}
-.dim-icon { font-size: 15px; }
-
-.feedback-list { width: 100%; display: flex; flex-direction: column; gap: 8px; }
-.feedback-item {
-  background: #f8f9ff;
-  border-left: 3px solid #409eff;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13px; color: #4a4a6a; line-height: 1.6;
-}
-
-.streak-badge {
+.record-btn {
   display: flex; align-items: center; gap: 10px;
-  background: #fff7e6; border: 1px solid #ffd591; border-radius: 20px;
-  padding: 8px 20px; font-size: 15px; font-weight: 600; color: #ad6800;
+  padding: 14px 32px; border-radius: 40px;
+  background: var(--accent); color: #fff;
+  font-size: 15px; font-weight: 700; border: none; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+  box-shadow: 0 4px 14px rgba(99,102,241,0.35);
 }
-.streak-badge.new-record {
-  background: linear-gradient(135deg, #fff7e6, #fff0b3);
-  border-color: #ffd666;
+.record-btn:hover { background: #5457e0; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.45); }
+.record-btn:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
+.record-btn-redo { background: var(--bg-content); color: var(--t-secondary); border: 1.5px solid var(--border); box-shadow: none; }
+.record-btn-redo:hover { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+.record-hint { font-size: 12px; color: var(--t-faint); text-align: center; }
+
+/* Recording active */
+.rec-active { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.rec-header { display: flex; align-items: center; gap: 8px; }
+.rec-dot-blink {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--red); box-shadow: 0 0 8px rgba(239,68,68,0.8);
+  animation: blink 1.2s ease-in-out infinite;
 }
-.new-record-badge {
-  background: #fa8c16; color: #fff; font-size: 12px;
-  padding: 2px 8px; border-radius: 10px;
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.rec-label  { font-size: 12px; font-weight: 700; color: var(--t-muted); letter-spacing: 1px; text-transform: uppercase; }
+.rec-timer  { font-size: 56px; font-weight: 900; color: var(--t-primary); letter-spacing: -2px; line-height: 1; font-variant-numeric: tabular-nums; }
+.rec-progress-track { width: 100%; height: 4px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.rec-progress-fill  { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.5s; }
+.rec-progress-fill.overshoot { background: var(--orange); }
+.rec-progress-label { font-size: 12px; color: var(--t-faint); }
+.rec-overshoot { color: var(--orange); font-weight: 600; margin-left: 6px; }
+.stop-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 28px; border-radius: 30px; font-size: 14px; font-weight: 700;
+  background: var(--red); color: #fff; border: none; cursor: pointer;
+  transition: all 0.15s; font-family: inherit; margin-top: 6px;
 }
+.stop-btn:hover { background: #dc2626; }
+.stop-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
-.ref-answer { width: 100%; }
-.ref-title  { font-size: 14px; font-weight: 600; color: #303133; }
-.ref-content { font-size: 13px; color: #4a4a6a; line-height: 1.8; white-space: pre-wrap; padding: 4px 8px; }
-
-.redo-btn { margin-top: 4px; width: 160px; }
-
-/* ── History ── */
-.history-strip {
-  background: #fff; border-radius: 16px; padding: 20px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.06);
+/* Uploading */
+.uploading-state { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.upload-spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid var(--border-light); border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
 }
-.history-title { font-size: 14px; font-weight: 600; color: #606266; margin: 0 0 14px; }
-.history-list  { display: flex; gap: 8px; flex-wrap: wrap; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.upload-text { font-size: 13px; color: var(--t-muted); font-weight: 500; }
+.upload-bar-track { width: 100%; height: 4px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.upload-bar-fill  { height: 100%; background: var(--accent); transition: width 0.3s; }
+.upload-pct { font-size: 12px; color: var(--t-faint); }
 
-.history-dot {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  width: 44px; padding: 8px 4px; border-radius: 10px;
+/* Score reveal */
+.score-reveal { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.score-ring   { position: relative; width: 88px; height: 88px; }
+.score-ring-inner {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
-.history-dot.score-high { background: #f0f9eb; }
-.history-dot.score-mid  { background: #fdf6ec; }
-.history-dot.score-low  { background: #fef0f0; }
+.score-big  { font-size: 26px; font-weight: 900; color: var(--t-primary); line-height: 1; }
+.score-unit { font-size: 11px; color: var(--t-muted); }
 
-.dot-date { font-size: 11px; color: #909399; }
-.dot-score { font-size: 13px; font-weight: 700; }
-.history-dot.score-high .dot-score { color: #67c23a; }
-.history-dot.score-mid  .dot-score { color: #e6a23c; }
-.history-dot.score-low  .dot-score { color: #f56c6c; }
+.score-dims { display: flex; gap: 16px; }
+.score-dim  { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.dim-label  { font-size: 11px; color: var(--t-faint); }
+.dim-val    { font-size: 13px; font-weight: 700; color: var(--t-primary); }
+
+.score-feedback { width: 100%; background: var(--bg-content); border-radius: var(--radius-md); padding: 10px 14px; }
+.feedback-line  { font-size: 13px; color: var(--t-secondary); line-height: 1.7; }
+
+.streak-celebrate {
+  font-size: 14px; font-weight: 700; color: var(--orange);
+  background: rgba(249,115,22,0.08); padding: 7px 16px; border-radius: 20px;
+}
+.new-record { font-size: 11px; color: var(--green); font-weight: 700; margin-left: 8px; }
+
+.ref-collapse { width: 100%; }
+.ref-title   { font-size: 13px; font-weight: 600; color: var(--t-muted); }
+.ref-content { font-size: 13px; color: var(--t-secondary); line-height: 1.7; padding: 8px 0; }
+
+/* Aside cards */
+.dp-aside { display: flex; flex-direction: column; gap: 14px; }
+.aside-card { padding: 18px; }
+.aside-card-title { font-size: 13px; font-weight: 700; color: var(--t-primary); margin-bottom: 12px; }
+
+/* Streak */
+.streak-top { display: flex; align-items: flex-end; gap: 6px; margin-bottom: 2px; }
+.streak-num { font-size: 40px; font-weight: 900; color: var(--t-primary); line-height: 1; }
+.streak-fire { font-size: 28px; }
+.streak-sub { font-size: 12px; color: var(--t-faint); margin-bottom: 14px; }
+
+.week-dots  { display: flex; gap: 6px; margin-bottom: 4px; }
+.week-dot   {
+  flex: 1; height: 8px; border-radius: 4px;
+  background: var(--border-light); transition: background 0.2s;
+}
+.week-dot.done  { background: var(--accent); }
+.week-dot.today { background: var(--orange); }
+.week-labels { display: flex; gap: 6px; }
+.week-labels span { flex: 1; text-align: center; font-size: 10px; color: var(--t-faint); }
+
+/* Weekly plan */
+.weekly-plan { display: flex; flex-direction: column; gap: 8px; }
+.weekly-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--t-muted); }
+.weekly-item.active { color: var(--t-primary); font-weight: 600; }
+.weekly-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot-intro { background: var(--accent); }
+.dot-case  { background: var(--green); }
+.dot-term  { background: var(--cyan); }
+.dot-qa    { background: var(--amber); }
+.dot-comp  { background: var(--red); }
+.dot-rev   { background: var(--orange); }
+.weekly-today-badge { margin-left: auto; font-size: 10px; color: var(--accent); font-weight: 700; }
+
+/* History bars */
+.history-bars { display: flex; align-items: flex-end; gap: 5px; height: 56px; margin-bottom: 8px; }
+.history-bar-wrap { flex: 1; display: flex; align-items: flex-end; justify-content: center; }
+.history-bar { width: 100%; border-radius: 3px 3px 0 0; min-height: 4px; transition: height 0.4s; }
+.history-bar.score-high { background: var(--green); }
+.history-bar.score-mid  { background: var(--amber); }
+.history-bar.score-low  { background: var(--red); }
+.history-stats { font-size: 12px; color: var(--t-faint); text-align: center; }
+.history-stats strong { color: var(--t-primary); }
 </style>

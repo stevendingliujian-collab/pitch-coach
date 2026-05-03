@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OTD AI 述标教练 — V2 设计稿</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Core palette — inspired by Linear/Vercel */
+  --bg-sidebar:   #0F0F13;
+  --bg-content:   #F5F5F7;
+  --bg-card:      #FFFFFF;
+  --accent:       #6366F1;
+  --accent-light: rgba(99,102,241,0.12);
+  --accent-dim:   rgba(99,102,241,0.08);
+  --green:        #22C55E;
+  --orange:       #F97316;
+  --red:          #EF4444;
+  --amber:        #F59E0B;
+  --cyan:         #06B6D4;
+  /* Text */
+  --t-primary:    #111827;
+  --t-secondary:  #374151;
+  --t-muted:      #6B7280;
+  --t-faint:      #9CA3AF;
+  --t-sidebar:    rgba(255,255,255,0.55);
+  --t-sidebar-active: #FFFFFF;
+  /* Borders */
+  --border:       #E5E7EB;
+  --border-light: #F3F4F6;
+  /* Shadows */
+  --shadow-sm:    0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md:    0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg:    0 4px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06);
+  --shadow-xl:    0 8px 32px rgba(0,0,0,0.14);
+  /* Layout */
+  --sidebar-w:    220px;
+  --topbar-h:     52px;
+  --radius-sm:    6px;
+  --radius-md:    10px;
+  --radius-lg:    14px;
+  --radius-xl:    18px;
+}
+
+body {
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: var(--bg-content);
+  color: var(--t-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Demo switcher bar ──────────────────────────────── */
+.demo-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  height: 36px;
+  background: #18181B;
+  display: flex; align-items: center;
+  padding: 0 14px; gap: 2px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.demo-bar-label { color: #52525B; font-size: 11px; margin-right: 10px; font-weight: 500; }
+.demo-btn {
+  background: none; border: none; color: #A1A1AA;
+  padding: 4px 11px; border-radius: 5px; font-size: 12px;
+  cursor: pointer; transition: all 0.15s; font-weight: 500;
+  font-family: inherit;
+}
+.demo-btn:hover { background: #27272A; color: #E4E4E7; }
+.demo-btn.active { background: #6366F1; color: #fff; }
+body { padding-top: 36px; }
+
+/* ── App shell ──────────────────────────────────────── */
+.shell { display: flex; height: calc(100vh - 36px); overflow: hidden; }
+
+/* ── Sidebar ────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w); flex-shrink: 0;
+  background: var(--bg-sidebar);
+  display: flex; flex-direction: column;
+  border-right: 1px solid rgba(255,255,255,0.04);
+}
+
+.sidebar-logo {
+  height: var(--topbar-h); flex-shrink: 0;
+  display: flex; align-items: center; gap: 9px;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.logo-mark {
+  width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-mark svg { width: 16px; height: 16px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; }
+.logo-text { color: #fff; font-size: 13.5px; font-weight: 700; letter-spacing: -0.3px; }
+.logo-text small { display: block; font-size: 9.5px; color: rgba(255,255,255,0.3); font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; margin-top: 1px; }
+
+.sidebar-nav { flex: 1; padding: 10px 8px; overflow-y: auto; }
+.sidebar-nav::-webkit-scrollbar { display: none; }
+
+.nav-group { margin-bottom: 22px; }
+.nav-group-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.7px;
+  color: rgba(255,255,255,0.2); text-transform: uppercase;
+  padding: 0 8px; margin-bottom: 3px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 8px; border-radius: var(--radius-sm);
+  color: var(--t-sidebar); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all 0.12s; position: relative;
+  user-select: none;
+}
+.nav-item:hover { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.8); }
+.nav-item.active {
+  background: var(--accent-light);
+  color: var(--t-sidebar-active);
+}
+.nav-item.active::before {
+  content: ''; position: absolute; left: -8px; top: 7px; bottom: 7px;
+  width: 3px; border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+.nav-icon { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.7; }
+.nav-item.active .nav-icon { opacity: 1; }
+.nav-item:hover .nav-icon { opacity: 0.9; }
+.nav-pill {
+  margin-left: auto; font-size: 9.5px; font-weight: 700;
+  padding: 2px 6px; border-radius: 10px; letter-spacing: 0.3px;
+}
+.nav-pill.free { background: rgba(34,197,94,0.18); color: #4ADE80; }
+.nav-pill.soon { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.3); }
+
+.sidebar-footer {
+  padding: 8px; border-top: 1px solid rgba(255,255,255,0.05);
+}
+/* Usage bar */
+.usage-bar-wrap { padding: 8px 10px 6px; }
+.usage-bar-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: rgba(255,255,255,0.28); margin-bottom: 5px; }
+.usage-bar-labels span:last-child { color: rgba(249,115,22,0.7); font-weight: 600; }
+.usage-track { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.usage-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg, #6366F1, #F97316); }
+/* User row */
+.user-row {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 10px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background 0.12s; margin-top: 2px;
+}
+.user-row:hover { background: rgba(255,255,255,0.05); }
+.user-av {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff;
+}
+.user-meta { flex: 1; min-width: 0; }
+.user-name { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-plan { font-size: 10px; color: rgba(255,255,255,0.28); margin-top: 1px; }
+
+/* ── Main area ──────────────────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Topbar */
+.topbar {
+  height: var(--topbar-h); flex-shrink: 0;
+  background: #fff; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 24px; gap: 10px;
+}
+.topbar-title { font-size: 15px; font-weight: 700; color: var(--t-primary); }
+.topbar-sep { color: var(--border); font-weight: 300; font-size: 18px; }
+.topbar-sub { font-size: 13px; color: var(--t-muted); }
+.topbar-flex { flex: 1; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--radius-sm); border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s; font-family: inherit;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #4F46E5; }
+.btn-ghost { background: var(--bg-content); color: var(--t-secondary); border: 1px solid var(--border); }
+.btn-ghost:hover { background: #EAEAEC; }
+
+/* Content scroll area */
+.content { flex: 1; overflow-y: auto; padding: 24px; }
+.content::-webkit-scrollbar { width: 5px; }
+.content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Pages ─────────────────────────────────────────── */
+.page { display: none; }
+.page.active { display: flex; flex-direction: column; flex: 1; height: 100%; overflow: hidden; }
+
+/* ════════════════════════════════════════════════════
+   PAGE 1: PROJECT LIST
+════════════════════════════════════════════════════ */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+
+.stat-card {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 18px 20px;
+  box-shadow: var(--shadow-sm); transition: box-shadow 0.2s;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.stat-card:hover { box-shadow: var(--shadow-md); }
+
+.stat-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.stat-dot { width: 8px; height: 8px; border-radius: 50%; }
+.stat-label { font-size: 12px; font-weight: 500; color: var(--t-muted); }
+.stat-value { font-size: 34px; font-weight: 800; color: var(--t-primary); line-height: 1; letter-spacing: -1px; }
+.stat-trend {
+  font-size: 11.5px; font-weight: 600; margin-top: 4px;
+  display: flex; align-items: center; gap: 3px;
+}
+.stat-trend.up { color: var(--green); }
+.stat-trend.orange { color: var(--orange); }
+
+/* Project grid */
+.section-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.section-title { font-size: 14px; font-weight: 700; color: var(--t-primary); }
+.section-link { font-size: 12px; font-weight: 500; color: var(--accent); cursor: pointer; }
+
+.project-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+.project-card {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 20px;
+  box-shadow: var(--shadow-sm); cursor: pointer;
+  transition: all 0.18s; position: relative;
+}
+.project-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+  border-color: rgba(99,102,241,0.3);
+}
+
+.project-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+.project-status-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px;
+}
+.status-ready  { background: #DCFCE7; color: #15803D; }
+.status-active { background: #EEF2FF; color: #4338CA; }
+.status-draft  { background: var(--bg-content); color: var(--t-muted); }
+.status-dot    { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+/* Readiness ring — SVG */
+.readiness-ring { flex-shrink: 0; }
+
+.project-name { font-size: 14px; font-weight: 700; color: var(--t-primary); line-height: 1.4; margin-bottom: 5px; }
+.project-meta { font-size: 11.5px; color: var(--t-muted); margin-bottom: 16px; }
+
+.project-divider { height: 1px; background: var(--border-light); margin-bottom: 12px; }
+
+.project-footer { display: flex; align-items: center; justify-content: space-between; }
+.project-stat-row { display: flex; gap: 14px; }
+.project-stat { font-size: 11.5px; color: var(--t-muted); display: flex; align-items: center; gap: 4px; }
+.proj-actions { display: flex; gap: 6px; }
+.icon-btn {
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  background: var(--bg-content); border: 1px solid var(--border);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s; color: var(--t-muted);
+}
+.icon-btn:hover { background: var(--border); color: var(--t-secondary); }
+.icon-btn svg { width: 14px; height: 14px; }
+
+/* New project card */
+.new-project {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1.5px dashed var(--border); padding: 20px;
+  cursor: pointer; transition: all 0.18s;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; min-height: 200px; color: var(--t-faint);
+}
+.new-project:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.new-project-plus { width: 36px; height: 36px; border-radius: 50%; border: 2px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1; }
+.new-project span { font-size: 13px; font-weight: 600; }
+.new-project small { font-size: 11px; opacity: 0.6; }
+
+
+/* ════════════════════════════════════════════════════
+   PAGE 2/3: DAILY PRACTICE (idle + recording)
+════════════════════════════════════════════════════ */
+.practice-layout { display: grid; grid-template-columns: 1fr 300px; gap: 16px; }
+
+/* Main card */
+.practice-card {
+  background: var(--bg-card); border-radius: var(--radius-xl);
+  border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.practice-card-header {
+  background: #0F0F13; padding: 22px 26px;
+}
+.practice-tags { display: flex; gap: 7px; margin-bottom: 10px; }
+.ptag {
+  font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 20px;
+  background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.65);
+}
+.ptag.accent { background: rgba(99,102,241,0.25); color: #A5B4FC; }
+.practice-title { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 5px; line-height: 1.3; }
+.practice-subtitle { font-size: 12.5px; color: rgba(255,255,255,0.45); }
+
+.practice-body { padding: 22px 26px; }
+
+.content-box {
+  background: var(--bg-content); border-radius: var(--radius-md);
+  border: 1px solid var(--border); padding: 16px 18px;
+  margin-bottom: 18px;
+  font-size: 13.5px; line-height: 1.75; color: var(--t-secondary);
+}
+.content-box ol { padding-left: 18px; }
+.content-box li { margin-bottom: 3px; }
+.content-box .tip {
+  margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px; color: var(--t-muted);
+  display: flex; gap: 7px; align-items: flex-start;
+}
+
+.meta-chips { display: flex; gap: 16px; margin-bottom: 16px; align-items: center; }
+.meta-chip { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--t-muted); }
+.meta-chip strong { color: var(--t-primary); font-weight: 700; }
+.meta-chip svg { width: 14px; height: 14px; color: var(--t-faint); }
+
+.kw-label { font-size: 11px; font-weight: 600; color: var(--t-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.keywords { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 22px; }
+.kw {
+  padding: 4px 11px; border-radius: 20px; font-size: 12px; font-weight: 500;
+  background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(99,102,241,0.2);
+}
+
+.record-btn {
+  width: 100%; height: 48px; border-radius: var(--radius-md); border: none;
+  background: var(--accent); color: #fff;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  box-shadow: 0 4px 14px rgba(99,102,241,0.35);
+  transition: all 0.18s; font-family: inherit;
+}
+.record-btn:hover { background: #4F46E5; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+.record-btn svg { width: 18px; height: 18px; }
+.record-hint { text-align: center; margin-top: 8px; font-size: 11.5px; color: var(--t-faint); }
+
+/* Sidebar cards */
+.practice-sidebar { display: flex; flex-direction: column; gap: 12px; }
+
+.side-card {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.side-card-title {
+  font-size: 12px; font-weight: 700; color: var(--t-primary);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+}
+.side-card-title svg { width: 14px; height: 14px; color: var(--t-muted); }
+
+/* Streak ring */
+.streak-center { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.streak-num { font-size: 40px; font-weight: 900; color: var(--t-primary); line-height: 1; letter-spacing: -2px; }
+.streak-unit { font-size: 12px; color: var(--t-muted); margin-top: 4px; }
+.streak-flame { font-size: 36px; line-height: 1; }
+
+.week-dots { display: flex; gap: 5px; }
+.wd { flex: 1; text-align: center; }
+.wd-dot { width: 100%; height: 6px; border-radius: 3px; background: var(--border-light); margin: 0 auto; }
+.wd-dot.done { background: var(--orange); }
+.wd-dot.today { background: var(--accent); }
+.wd-label { font-size: 9.5px; color: var(--t-faint); margin-top: 3px; }
+
+/* Weekly plan */
+.week-list { display: flex; flex-direction: column; gap: 4px; }
+.wl-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 6px 8px; border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--t-secondary);
+  cursor: pointer; transition: background 0.12s;
+}
+.wl-item:hover { background: var(--bg-content); }
+.wl-item.today { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+.wl-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* Mini bar chart */
+.bar-chart { display: flex; gap: 4px; align-items: flex-end; height: 44px; }
+.bar {
+  flex: 1; border-radius: 3px 3px 0 0;
+  background: var(--border-light); min-height: 4px;
+  transition: background 0.2s;
+}
+.bar.has { background: linear-gradient(180deg, #818CF8, #6366F1); }
+.bar.empty { background: var(--border-light); }
+.chart-foot { display: flex; justify-content: space-between; margin-top: 6px; font-size: 10px; color: var(--t-faint); }
+.chart-avg { text-align: center; margin-top: 8px; font-size: 11.5px; color: var(--t-muted); }
+.chart-avg strong { color: var(--accent); }
+
+/* ── RECORDING MODE (immersive dark) ── */
+.recording-shell {
+  position: absolute; inset: 0;
+  background: #0A0A12;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 0;
+  z-index: 10;
+}
+.rec-exit {
+  position: absolute; top: 16px; left: 20px;
+  display: flex; align-items: center; gap: 6px;
+  color: rgba(255,255,255,0.35); font-size: 12.5px; font-weight: 500;
+  cursor: pointer; padding: 6px 10px; border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.05); border: none; transition: all 0.15s;
+  font-family: inherit;
+}
+.rec-exit:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.08); }
+.rec-exit svg { width: 14px; height: 14px; }
+
+.rec-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  color: rgba(99,102,241,0.7); text-transform: uppercase; margin-bottom: 28px;
+  display: flex; align-items: center; gap: 7px;
+}
+.rec-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #EF4444;
+  box-shadow: 0 0 8px rgba(239,68,68,0.8);
+  animation: blink 1.2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+.rec-timer {
+  font-size: 72px; font-weight: 900; color: #fff;
+  line-height: 1; letter-spacing: -3px; margin-bottom: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.rec-target { font-size: 13px; color: rgba(255,255,255,0.28); margin-bottom: 36px; }
+
+/* Audio waveform */
+.waveform {
+  display: flex; align-items: center; gap: 3px; height: 52px;
+  margin-bottom: 36px;
+}
+.wave-bar {
+  width: 4px; border-radius: 2px;
+  background: linear-gradient(180deg, #818CF8, rgba(99,102,241,0.3));
+  animation: wave 0.9s ease-in-out infinite;
+}
+.wave-bar:nth-child(1)  { animation-delay: 0.00s; }
+.wave-bar:nth-child(2)  { animation-delay: 0.07s; }
+.wave-bar:nth-child(3)  { animation-delay: 0.14s; }
+.wave-bar:nth-child(4)  { animation-delay: 0.21s; }
+.wave-bar:nth-child(5)  { animation-delay: 0.28s; }
+.wave-bar:nth-child(6)  { animation-delay: 0.35s; }
+.wave-bar:nth-child(7)  { animation-delay: 0.42s; }
+.wave-bar:nth-child(8)  { animation-delay: 0.49s; }
+.wave-bar:nth-child(9)  { animation-delay: 0.56s; }
+.wave-bar:nth-child(10) { animation-delay: 0.63s; }
+.wave-bar:nth-child(11) { animation-delay: 0.70s; }
+.wave-bar:nth-child(12) { animation-delay: 0.77s; }
+.wave-bar:nth-child(13) { animation-delay: 0.84s; }
+.wave-bar:nth-child(14) { animation-delay: 0.77s; }
+.wave-bar:nth-child(15) { animation-delay: 0.70s; }
+.wave-bar:nth-child(16) { animation-delay: 0.63s; }
+.wave-bar:nth-child(17) { animation-delay: 0.56s; }
+.wave-bar:nth-child(18) { animation-delay: 0.49s; }
+.wave-bar:nth-child(19) { animation-delay: 0.42s; }
+.wave-bar:nth-child(20) { animation-delay: 0.35s; }
+@keyframes wave {
+  0%,100% { height: 8px; }
+  50%      { height: 44px; }
+}
+
+.rec-keywords { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 40px; }
+.rec-kw {
+  padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 600;
+  background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.4);
+  border: 1px solid rgba(255,255,255,0.08); transition: all 0.3s;
+}
+.rec-kw.hit {
+  background: rgba(34,197,94,0.15); color: #4ADE80;
+  border-color: rgba(34,197,94,0.3);
+  box-shadow: 0 0 12px rgba(34,197,94,0.1);
+}
+
+.stop-btn {
+  width: 56px; height: 56px; border-radius: 50%; border: none;
+  background: #EF4444; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(239,68,68,0.4); transition: all 0.15s;
+}
+.stop-btn:hover { transform: scale(1.08); box-shadow: 0 6px 28px rgba(239,68,68,0.5); }
+.stop-btn svg { width: 20px; height: 20px; fill: #fff; }
+
+/* ════════════════════════════════════════════════════
+   PAGE 4: KNOWLEDGE
+════════════════════════════════════════════════════ */
+.k-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 20px; }
+.k-stat {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.k-icon {
+  width: 38px; height: 38px; border-radius: var(--radius-sm); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.k-icon svg { width: 20px; height: 20px; }
+.k-icon.indigo { background: #EEF2FF; color: #6366F1; }
+.k-icon.green  { background: #F0FDF4; color: #16A34A; }
+.k-icon.amber  { background: #FFFBEB; color: #D97706; }
+.k-stat-val { font-size: 22px; font-weight: 800; color: var(--t-primary); line-height: 1; }
+.k-stat-lbl { font-size: 11px; color: var(--t-muted); margin-top: 2px; }
+
+.k-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.search-field {
+  flex: 1; max-width: 360px;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 8px 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.search-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+.search-field svg { width: 15px; height: 15px; color: var(--t-faint); flex-shrink: 0; }
+.search-field input {
+  border: none; outline: none; font-size: 13px; color: var(--t-primary);
+  background: transparent; width: 100%; font-family: inherit;
+}
+.search-field input::placeholder { color: var(--t-faint); }
+.kbd { font-size: 10px; color: var(--t-faint); background: var(--bg-content); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+.filter-select {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 8px 12px;
+  font-size: 13px; color: var(--t-secondary); cursor: pointer; outline: none;
+  font-family: inherit;
+}
+
+/* Doc grid */
+.doc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.doc-card {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 16px;
+  cursor: pointer; transition: all 0.18s;
+  box-shadow: var(--shadow-sm);
+}
+.doc-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-1px); border-color: rgba(99,102,241,0.2); }
+.doc-type-icon {
+  width: 40px; height: 40px; border-radius: var(--radius-sm); margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.doc-type-icon svg { width: 22px; height: 22px; }
+.doc-type-pdf   { background: #FEF2F2; color: #DC2626; }
+.doc-type-pptx  { background: #FFF7ED; color: #EA580C; }
+.doc-type-txt   { background: #F0FDF4; color: #16A34A; }
+.doc-type-docx  { background: #EFF6FF; color: #2563EB; }
+
+.doc-card-name { font-size: 13px; font-weight: 600; color: var(--t-primary); margin-bottom: 3px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.doc-card-sub  { font-size: 11px; color: var(--t-muted); margin-bottom: 12px; }
+.doc-card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.doc-tag {
+  font-size: 10.5px; font-weight: 500; padding: 2px 7px; border-radius: 10px;
+  background: var(--bg-content); color: var(--t-muted);
+}
+
+/* Embed progress */
+.embed-row { display: flex; align-items: center; gap: 7px; }
+.embed-label { font-size: 10.5px; color: var(--t-muted); white-space: nowrap; }
+.embed-track { flex: 1; height: 4px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
+.embed-fill { height: 100%; border-radius: 2px; }
+.embed-fill.done { background: var(--green); }
+.embed-fill.prog { background: var(--accent); animation: progress-pulse 1.5s ease-in-out infinite; }
+@keyframes progress-pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+.embed-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 10px; white-space: nowrap;
+}
+.embed-badge.done { background: #DCFCE7; color: #15803D; }
+.embed-badge.prog { background: #DBEAFE; color: #1D4ED8; }
+
+
+/* ════════════════════════════════════════════════════
+   PAGE 5: PROJECT DETAIL
+════════════════════════════════════════════════════ */
+.detail-layout { display: grid; grid-template-columns: 240px 1fr; gap: 16px; height: 100%; }
+
+.slide-list {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  overflow-y: auto; padding: 8px;
+}
+.slide-list::-webkit-scrollbar { width: 4px; }
+.slide-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.slide-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer;
+  transition: background 0.12s; margin-bottom: 2px;
+}
+.slide-item:hover { background: var(--bg-content); }
+.slide-item.active { background: var(--accent-dim); }
+.slide-thumb {
+  width: 52px; height: 33px; border-radius: 4px; flex-shrink: 0;
+  background: linear-gradient(135deg, #E0E7FF, #C7D2FE);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; color: var(--accent); font-weight: 700;
+  position: relative; overflow: hidden;
+}
+.slide-thumb-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 4px 5px; gap: 2px; }
+.slide-line { height: 2px; background: rgba(99,102,241,0.4); border-radius: 1px; }
+.slide-line.short { width: 60%; }
+.slide-meta { flex: 1; min-width: 0; }
+.slide-num { font-size: 10px; color: var(--t-faint); }
+.slide-title { font-size: 12px; font-weight: 600; color: var(--t-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slide-score-dot {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 8.5px; font-weight: 800;
+}
+.slide-score-dot.good { background: #DCFCE7; color: #15803D; }
+.slide-score-dot.mid  { background: #FEF9C3; color: #A16207; }
+.slide-score-dot.none { background: var(--bg-content); color: var(--t-faint); }
+
+/* Detail main */
+.detail-main { display: flex; flex-direction: column; gap: 14px; }
+
+.detail-tabs {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); padding: 0 4px;
+  display: flex; gap: 0;
+}
+.detail-tab {
+  padding: 12px 16px; font-size: 13px; font-weight: 600;
+  color: var(--t-muted); cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.15s; white-space: nowrap;
+}
+.detail-tab:hover { color: var(--t-primary); }
+.detail-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.plan-card {
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  flex: 1; overflow: hidden;
+}
+.plan-card-head {
+  background: linear-gradient(135deg, #0F0F13, #1a1a2e);
+  padding: 18px 22px;
+}
+.plan-page-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(99,102,241,0.2); border: 1px solid rgba(99,102,241,0.3);
+  border-radius: 20px; padding: 4px 10px; margin-bottom: 10px;
+}
+.plan-page-badge span { font-size: 11px; font-weight: 600; color: #A5B4FC; }
+.plan-slide-title { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+.plan-slide-meta { font-size: 12px; color: rgba(255,255,255,0.35); }
+
+.plan-body { padding: 20px 22px; }
+.plan-section-label {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px;
+  color: var(--t-faint); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.plan-section-label::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
+.plan-points { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; }
+.plan-point {
+  display: flex; gap: 10px; padding: 10px 12px;
+  background: var(--bg-content); border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent); font-size: 13px; line-height: 1.6; color: var(--t-secondary);
+}
+.plan-point-num {
+  font-size: 11px; font-weight: 800; color: var(--accent);
+  min-width: 16px; padding-top: 2px;
+}
+.plan-keywords { display: flex; flex-wrap: wrap; gap: 6px; }
+.plan-kw {
+  padding: 4px 10px; border-radius: 20px; font-size: 11.5px; font-weight: 500;
+  background: var(--bg-content); color: var(--t-secondary); border: 1px solid var(--border);
+}
+.plan-kw.highlight { background: var(--accent-dim); color: var(--accent); border-color: rgba(99,102,241,0.25); }
+
+
+/* ── Helpers ────────────────────────────────────────── */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+</style>
+</head>
+<body>
+
+<!-- Demo switcher -->
+<div class="demo-bar">
+  <span class="demo-bar-label">V2 设计稿</span>
+  <button class="demo-btn active" onclick="show('projects',this)">项目列表</button>
+  <button class="demo-btn" onclick="show('practice',this)">每日练习</button>
+  <button class="demo-btn" onclick="show('recording',this)">录音中</button>
+  <button class="demo-btn" onclick="show('knowledge',this)">知识库</button>
+  <button class="demo-btn" onclick="show('detail',this)">项目详情</button>
+</div>
+
+<div class="shell">
+
+  <!-- ══════════════ SIDEBAR ══════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 16 16"><polyline points="1,11 5,7 9,10 15,3"/></svg>
+      </div>
+      <div class="logo-text">述标教练<small>OTD AI · PITCH COACH</small></div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-group">
+        <div class="nav-group-label">工作台</div>
+        <div class="nav-item active" id="nav-projects" onclick="show('projects',null);setNav(this)">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="7" height="7" rx="1.5"/><rect x="11" y="3" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
+          我的项目
+        </div>
+        <div class="nav-item" id="nav-practice" onclick="show('practice',null);setNav(this)">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7.5"/><polyline points="10,6 10,10 13,12"/></svg>
+          每日微练习
+          <span class="nav-pill free">免费</span>
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">资产库</div>
+        <div class="nav-item" id="nav-knowledge" onclick="show('knowledge',null);setNav(this)">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="2" width="14" height="16" rx="1.5"/><line x1="7" y1="7" x2="13" y2="7"/><line x1="7" y1="11" x2="13" y2="11"/><line x1="7" y1="15" x2="10" y2="15"/></svg>
+          知识库
+        </div>
+        <div class="nav-item" style="opacity:.35;pointer-events:none">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="10,2 12.9,7.6 19,8.5 14.5,12.9 15.6,19 10,16 4.4,19 5.5,12.9 1,8.5 7.1,7.6"/></svg>
+          话术宝典
+          <span class="nav-pill soon">即将</span>
+        </div>
+      </div>
+      <div class="nav-group">
+        <div class="nav-group-label">分析</div>
+        <div class="nav-item" style="opacity:.35;pointer-events:none">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="2,14 7,9 11,12 18,5"/><polyline points="14,5 18,5 18,9"/></svg>
+          进步看板
+          <span class="nav-pill soon">即将</span>
+        </div>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="usage-bar-wrap">
+        <div class="usage-bar-labels">
+          <span>本月项目用量</span>
+          <span>3/3 已用尽</span>
+        </div>
+        <div class="usage-track">
+          <div class="usage-fill" style="width:100%"></div>
+        </div>
+      </div>
+      <div class="user-row">
+        <div class="user-av">测</div>
+        <div class="user-meta">
+          <div class="user-name">测试用户</div>
+          <div class="user-plan">免费版</div>
+        </div>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"><circle cx="7" cy="7" r="2.5"/><path d="M7 1v1.5M7 11.5V13M1 7h1.5M11.5 7H13M2.93 2.93l1.06 1.06M10.01 10.01l1.06 1.06M2.93 11.07l1.06-1.06M10.01 3.99l1.06-1.06"/></svg>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════════════ MAIN ══════════════ -->
+  <main class="main">
+
+    <!-- ═══ PAGE: Projects ═══ -->
+    <div id="page-projects" class="page active">
+      <div class="topbar">
+        <span class="topbar-title">我的项目</span>
+        <div class="topbar-flex"></div>
+        <button class="btn btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 1v12M1 7h12"/></svg>
+          导入 PPT
+        </button>
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 1v12M1 7h12"/></svg>
+          新建项目
+        </button>
+      </div>
+      <div class="content">
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-head">
+              <span class="stat-label">项目总数</span>
+              <div class="stat-dot" style="background:#6366F1"></div>
+            </div>
+            <div class="stat-value">3</div>
+            <div class="stat-trend up">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2,9 6,4 10,9"/></svg>
+              本月新增 2 个
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-head">
+              <span class="stat-label">累计排练</span>
+              <div class="stat-dot" style="background:#22C55E"></div>
+            </div>
+            <div class="stat-value">18</div>
+            <div class="stat-trend up">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2,9 6,4 10,9"/></svg>
+              较上月 +6 次
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-head">
+              <span class="stat-label">平均得分</span>
+              <div class="stat-dot" style="background:#F59E0B"></div>
+            </div>
+            <div class="stat-value">82</div>
+            <div class="stat-trend up">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2,9 6,4 10,9"/></svg>
+              较上次 +4 分
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-head">
+              <span class="stat-label">连续打卡</span>
+              <div class="stat-dot" style="background:#F97316"></div>
+            </div>
+            <div class="stat-value">5</div>
+            <div class="stat-trend orange">
+              🔥 天连击
+            </div>
+          </div>
+        </div>
+
+        <div class="section-row">
+          <span class="section-title">项目列表</span>
+          <span class="section-link">全部 →</span>
+        </div>
+
+        <div class="project-grid">
+
+          <!-- Card 1: Ready -->
+          <div class="project-card" onclick="show('detail',null);setNav(document.getElementById('nav-projects'))">
+            <div class="project-card-top">
+              <span class="project-status-badge status-ready"><span class="status-dot"></span>述标就绪</span>
+              <!-- Readiness ring 87% -->
+              <svg class="readiness-ring" width="44" height="44" viewBox="0 0 44 44">
+                <circle cx="22" cy="22" r="17" fill="none" stroke="#F3F4F6" stroke-width="4"/>
+                <circle cx="22" cy="22" r="17" fill="none" stroke="#22C55E" stroke-width="4"
+                  stroke-dasharray="107" stroke-dashoffset="14"
+                  stroke-linecap="round" transform="rotate(-90 22 22)"/>
+                <text x="22" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#15803D" font-family="Inter,sans-serif">87</text>
+              </svg>
+            </div>
+            <div class="project-name">2026年智慧园区综合管理平台采购项目</div>
+            <div class="project-meta">12 页 PPT · 最近排练 2 小时前</div>
+            <div class="project-divider"></div>
+            <div class="project-footer">
+              <div class="project-stat-row">
+                <span class="project-stat">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.5" cy="6.5" r="5"/><path d="M6.5 4v2.5l1.5 1.5"/></svg>
+                  8 次排练
+                </span>
+              </div>
+              <div class="proj-actions">
+                <button class="icon-btn" title="开始排练">
+                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="6"/><polygon points="5.5,4.5 10,7 5.5,9.5" fill="currentColor" stroke="none"/></svg>
+                </button>
+                <button class="icon-btn" title="查看方案">
+                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="1.5" width="10" height="11" rx="1.2"/><line x1="5" y1="5" x2="9" y2="5"/><line x1="5" y1="7.5" x2="9" y2="7.5"/><line x1="5" y1="10" x2="7" y2="10"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: In progress -->
+          <div class="project-card">
+            <div class="project-card-top">
+              <span class="project-status-badge status-active"><span class="status-dot"></span>排练中</span>
+              <!-- Readiness ring 63% -->
+              <svg class="readiness-ring" width="44" height="44" viewBox="0 0 44 44">
+                <circle cx="22" cy="22" r="17" fill="none" stroke="#F3F4F6" stroke-width="4"/>
+                <circle cx="22" cy="22" r="17" fill="none" stroke="#F59E0B" stroke-width="4"
+                  stroke-dasharray="107" stroke-dashoffset="40"
+                  stroke-linecap="round" transform="rotate(-90 22 22)"/>
+                <text x="22" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#B45309" font-family="Inter,sans-serif">63</text>
+              </svg>
+            </div>
+            <div class="project-name">非标自动化生产线改造项目述标</div>
+            <div class="project-meta">8 页 PPT · 最近排练 昨天</div>
+            <div class="project-divider"></div>
+            <div class="project-footer">
+              <div class="project-stat-row">
+                <span class="project-stat">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6.5" cy="6.5" r="5"/><path d="M6.5 4v2.5l1.5 1.5"/></svg>
+                  5 次排练
+                </span>
+              </div>
+              <div class="proj-actions">
+                <button class="icon-btn"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="6"/><polygon points="5.5,4.5 10,7 5.5,9.5" fill="currentColor" stroke="none"/></svg></button>
+                <button class="icon-btn"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="1.5" width="10" height="11" rx="1.2"/><line x1="5" y1="5" x2="9" y2="5"/><line x1="5" y1="7.5" x2="9" y2="7.5"/><line x1="5" y1="10" x2="7" y2="10"/></svg></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 3: Generating -->
+          <div class="project-card">
+            <div class="project-card-top">
+              <span class="project-status-badge status-draft"><span class="status-dot"></span>方案生成中</span>
+              <!-- Readiness ring 0% (animated) -->
+              <svg class="readiness-ring" width="44" height="44" viewBox="0 0 44 44">
+                <circle cx="22" cy="22" r="17" fill="none" stroke="#F3F4F6" stroke-width="4"/>
+                <circle cx="22" cy="22" r="17" fill="none" stroke="#E5E7EB" stroke-width="4"
+                  stroke-dasharray="20 87" stroke-linecap="round" transform="rotate(-90 22 22)">
+                  <animateTransform attributeName="transform" type="rotate" from="-90 22 22" to="270 22 22" dur="1.5s" repeatCount="indefinite"/>
+                </circle>
+                <text x="22" y="26" text-anchor="middle" font-size="8" font-weight="700" fill="#9CA3AF" font-family="Inter,sans-serif">AI</text>
+              </svg>
+            </div>
+            <div class="project-name">某市政务信息化平台项目投标述标</div>
+            <div class="project-meta">16 页 PPT · 刚上传</div>
+            <div class="project-divider"></div>
+            <div class="project-footer">
+              <div class="project-stat-row">
+                <span class="project-stat">⏳ AI 分析中，约 1 分钟</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- New card -->
+          <div class="new-project">
+            <div class="new-project-plus">+</div>
+            <span>上传 PPT，创建项目</span>
+            <small>支持 PPTX / PDF</small>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: Practice (idle) ═══ -->
+    <div id="page-practice" class="page">
+      <div class="topbar">
+        <span class="topbar-title">每日微练习</span>
+        <span class="topbar-sep">/</span>
+        <span class="topbar-sub">周日 · 综合复习</span>
+        <div class="topbar-flex"></div>
+        <button class="btn btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="2,4 7,9 12,4"/><line x1="7" y1="9" x2="7" y2="1"/><rect x="1" y="11" width="12" height="2" rx="1"/></svg>
+          历史记录
+        </button>
+      </div>
+      <div class="content">
+        <div class="practice-layout">
+          <div class="practice-card">
+            <div class="practice-card-header">
+              <div class="practice-tags">
+                <span class="ptag">综合复习</span>
+                <span class="ptag">周日</span>
+                <span class="ptag accent">⏱ 目标 90 秒</span>
+              </div>
+              <div class="practice-title">述标场景模拟</div>
+              <div class="practice-subtitle">模拟完整述标开场 90 秒，展现专业形象与方案亮点</div>
+            </div>
+            <div class="practice-body">
+              <div class="content-box">
+                <strong>练习要求：</strong>请用 90 秒完成述标开场白，包含：
+                <ol style="margin-top:8px">
+                  <li>自我介绍（10 秒）</li>
+                  <li>公司简介（20 秒）</li>
+                  <li>本次方案核心亮点预告（30 秒）</li>
+                  <li>述标议程概述（15 秒）</li>
+                  <li>过渡语（5 秒）</li>
+                </ol>
+                <div class="tip">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" style="flex-shrink:0;margin-top:1px"><circle cx="7" cy="7" r="5.5"/><line x1="7" y1="5" x2="7" y2="7.5"/><circle cx="7" cy="9.5" r="0.6" fill="currentColor"/></svg>
+                  提示：开场要自信、清晰，避免「那个」「就是说」等填充词。
+                </div>
+              </div>
+              <div class="meta-chips">
+                <div class="meta-chip"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="5.5"/><polyline points="7,4 7,7 9,9"/></svg> 目标 <strong>90 秒</strong></div>
+                <div class="meta-chip"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 10L5 6l3 3 4-5"/></svg> 评分 <strong>3 维度</strong></div>
+                <div class="meta-chip"><svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><polygon points="7,1.5 9,5.5 13,6 10,9 10.5,13 7,11 3.5,13 4,9 1,6 5,5.5"/></svg> 满分 <strong>100</strong></div>
+              </div>
+              <div class="kw-label">评分关键点</div>
+              <div class="keywords">
+                <span class="kw">自我介绍</span>
+                <span class="kw">公司简介</span>
+                <span class="kw">方案亮点</span>
+                <span class="kw">议程</span>
+                <span class="kw">过渡语</span>
+              </div>
+              <button class="record-btn" onclick="show('recording',null)">
+                <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="1" width="6" height="10" rx="3"/><path d="M2 9a7 7 0 0014 0"/><line x1="9" y1="16" x2="9" y2="18"/><line x1="6" y1="18" x2="12" y2="18"/></svg>
+                开始录音
+              </button>
+              <div class="record-hint">点击后自动计时 · AI 完成后即时评分</div>
+            </div>
+          </div>
+
+          <div class="practice-sidebar">
+            <!-- Streak -->
+            <div class="side-card">
+              <div class="side-card-title">
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M7 13c-3.3 0-5-2-5-4.5 0-1.8 1-3 2.5-3.5-.3 1 .2 2 1 2.5C6 6 7 4 6.5 2 8.5 3 10 5.5 9 8c.8-.5 1.5-1.5 1.5-2.5 1 1 2.5 3 .5 5 0 1.5-1.5 2.5-4 2.5z"/></svg>
+                连续打卡
+              </div>
+              <div class="streak-center">
+                <div>
+                  <div class="streak-num">5</div>
+                  <div class="streak-unit">天连续练习</div>
+                </div>
+                <div class="streak-flame">🔥</div>
+              </div>
+              <div class="week-dots">
+                <div class="wd"><div class="wd-dot done"></div><div class="wd-label">一</div></div>
+                <div class="wd"><div class="wd-dot done"></div><div class="wd-label">二</div></div>
+                <div class="wd"><div class="wd-dot done"></div><div class="wd-label">三</div></div>
+                <div class="wd"><div class="wd-dot done"></div><div class="wd-label">四</div></div>
+                <div class="wd"><div class="wd-dot done"></div><div class="wd-label">五</div></div>
+                <div class="wd"><div class="wd-dot today"></div><div class="wd-label">六</div></div>
+                <div class="wd"><div class="wd-dot"></div><div class="wd-label">日</div></div>
+              </div>
+            </div>
+
+            <!-- Week plan -->
+            <div class="side-card">
+              <div class="side-card-title">
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="2" width="12" height="11" rx="1.5"/><line x1="1" y1="5.5" x2="13" y2="5.5"/><line x1="4.5" y1="1" x2="4.5" y2="4"/><line x1="9.5" y1="1" x2="9.5" y2="4"/></svg>
+                本周练习计划
+              </div>
+              <div class="week-list">
+                <div class="wl-item"><div class="wl-dot" style="background:#6366F1"></div>周一 · 口播开场</div>
+                <div class="wl-item"><div class="wl-dot" style="background:#8B5CF6"></div>周二 · 案例讲解</div>
+                <div class="wl-item"><div class="wl-dot" style="background:#06B6D4"></div>周三 · 技术术语</div>
+                <div class="wl-item"><div class="wl-dot" style="background:#F59E0B"></div>周四 · 质疑回应</div>
+                <div class="wl-item"><div class="wl-dot" style="background:#EF4444"></div>周五 · 竞品对比</div>
+                <div class="wl-item today"><div class="wl-dot" style="background:#22C55E"></div>周末 · 综合复习 ← 今天</div>
+              </div>
+            </div>
+
+            <!-- History chart -->
+            <div class="side-card">
+              <div class="side-card-title">
+                <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="1,11 5,7 8,9 13,3"/></svg>
+                近 7 次得分
+              </div>
+              <div class="bar-chart">
+                <div class="bar has" style="height:58%"></div>
+                <div class="bar has" style="height:70%"></div>
+                <div class="bar has" style="height:65%"></div>
+                <div class="bar has" style="height:78%"></div>
+                <div class="bar has" style="height:72%"></div>
+                <div class="bar has" style="height:85%"></div>
+                <div class="bar empty" style="height:10%"></div>
+              </div>
+              <div class="chart-foot"><span>7次前</span><span>今天</span></div>
+              <div class="chart-avg">平均 <strong>75</strong> 分 · 最高 <strong>85</strong> 分</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: Recording (immersive) ═══ -->
+    <div id="page-recording" class="page" style="position:relative;overflow:hidden;">
+      <div style="height:100%;display:flex;flex-direction:column;">
+        <div class="topbar" style="opacity:0;pointer-events:none;"></div>
+        <div style="flex:1;position:relative;">
+          <div class="recording-shell">
+            <button class="rec-exit" onclick="show('practice',null)">
+              <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="9,2 4,7 9,12"/></svg>
+              取消录音
+            </button>
+
+            <div class="rec-label">
+              <div class="rec-dot"></div>
+              正在录音
+            </div>
+
+            <div class="rec-timer">00:42</div>
+            <div class="rec-target">目标 90 秒</div>
+
+            <div class="waveform">
+              <div class="wave-bar" style="height:12px"></div>
+              <div class="wave-bar" style="height:20px"></div>
+              <div class="wave-bar" style="height:32px"></div>
+              <div class="wave-bar" style="height:44px"></div>
+              <div class="wave-bar" style="height:36px"></div>
+              <div class="wave-bar" style="height:28px"></div>
+              <div class="wave-bar" style="height:20px"></div>
+              <div class="wave-bar" style="height:30px"></div>
+              <div class="wave-bar" style="height:44px"></div>
+              <div class="wave-bar" style="height:38px"></div>
+              <div class="wave-bar" style="height:24px"></div>
+              <div class="wave-bar" style="height:16px"></div>
+              <div class="wave-bar" style="height:24px"></div>
+              <div class="wave-bar" style="height:38px"></div>
+              <div class="wave-bar" style="height:44px"></div>
+              <div class="wave-bar" style="height:30px"></div>
+              <div class="wave-bar" style="height:20px"></div>
+              <div class="wave-bar" style="height:28px"></div>
+              <div class="wave-bar" style="height:36px"></div>
+              <div class="wave-bar" style="height:14px"></div>
+            </div>
+
+            <div class="rec-keywords">
+              <span class="rec-kw hit">✓ 自我介绍</span>
+              <span class="rec-kw hit">✓ 公司简介</span>
+              <span class="rec-kw">方案亮点</span>
+              <span class="rec-kw">议程</span>
+              <span class="rec-kw">过渡语</span>
+            </div>
+
+            <button class="stop-btn" onclick="show('practice',null)">
+              <svg viewBox="0 0 20 20"><rect x="4" y="4" width="12" height="12" rx="2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: Knowledge ═══ -->
+    <div id="page-knowledge" class="page">
+      <div class="topbar">
+        <span class="topbar-title">知识库</span>
+        <div class="topbar-flex"></div>
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 1v9M3 7l4 4 4-4"/><rect x="1" y="11" width="12" height="2" rx="1"/></svg>
+          上传文档
+        </button>
+      </div>
+      <div class="content">
+        <div style="font-size:13px;color:var(--t-muted);margin-bottom:18px;">上传历史标书、白皮书、案例等文档，AI 将在生成讲解方案时自动引用</div>
+
+        <div class="k-stats">
+          <div class="k-stat">
+            <div class="k-icon indigo">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="2" width="14" height="16" rx="1.5"/><line x1="7" y1="7" x2="13" y2="7"/><line x1="7" y1="11" x2="13" y2="11"/><line x1="7" y1="15" x2="10" y2="15"/></svg>
+            </div>
+            <div><div class="k-stat-val">4</div><div class="k-stat-lbl">已上传文档</div></div>
+          </div>
+          <div class="k-stat">
+            <div class="k-icon green">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="2" width="7" height="7" rx="1"/><rect x="11" y="2" width="7" height="7" rx="1"/><rect x="2" y="11" width="7" height="7" rx="1"/><rect x="11" y="11" width="7" height="7" rx="1"/></svg>
+            </div>
+            <div><div class="k-stat-val">87</div><div class="k-stat-lbl">知识块</div></div>
+          </div>
+          <div class="k-stat">
+            <div class="k-icon amber">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10" cy="10" r="7.5"/><line x1="10" y1="6" x2="10" y2="10"/><line x1="10" y1="13" x2="10" y2="14"/></svg>
+            </div>
+            <div><div class="k-stat-val">12</div><div class="k-stat-lbl">本月引用次数</div></div>
+          </div>
+        </div>
+
+        <div class="k-toolbar">
+          <div class="search-field">
+            <svg viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6.5" cy="6.5" r="5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>
+            <input type="text" placeholder="搜索知识库内容…">
+            <span class="kbd">⌘K</span>
+          </div>
+          <select class="filter-select"><option>全部类型</option><option>案例研究</option><option>产品白皮书</option></select>
+          <select class="filter-select"><option>全部行业</option><option>政务信息化</option><option>非标自动化</option></select>
+        </div>
+
+        <div class="doc-grid">
+          <div class="doc-card">
+            <div class="doc-type-icon doc-type-pdf">
+              <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="1" width="16" height="20" rx="2"/><path d="M8 1v6h6"/><line x1="7" y1="12" x2="15" y2="12"/><line x1="7" y1="15" x2="12" y2="15"/></svg>
+            </div>
+            <div class="doc-card-name">2025年智慧城市赢标复盘.pdf</div>
+            <div class="doc-card-sub">2.4 MB · 34 知识块</div>
+            <div class="doc-card-tags"><span class="doc-tag">赢标复盘</span><span class="doc-tag">政务信息化</span></div>
+            <div class="embed-row">
+              <div class="embed-track"><div class="embed-fill done" style="width:100%"></div></div>
+              <span class="embed-badge done">已完成</span>
+            </div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-type-icon doc-type-pptx">
+              <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="1" width="16" height="20" rx="2"/><rect x="7" y="7" width="8" height="5" rx="1"/><line x1="7" y1="15" x2="15" y2="15"/></svg>
+            </div>
+            <div class="doc-card-name">产品方案白皮书 V3.pptx</div>
+            <div class="doc-card-sub">8.1 MB · 28 知识块</div>
+            <div class="doc-card-tags"><span class="doc-tag">产品白皮书</span><span class="doc-tag">系统集成</span></div>
+            <div class="embed-row">
+              <div class="embed-track"><div class="embed-fill done" style="width:100%"></div></div>
+              <span class="embed-badge done">已完成</span>
+            </div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-type-icon doc-type-txt">
+              <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="1" width="16" height="20" rx="2"/><line x1="7" y1="8" x2="15" y2="8"/><line x1="7" y1="12" x2="15" y2="12"/><line x1="7" y1="16" x2="11" y2="16"/></svg>
+            </div>
+            <div class="doc-card-name">winning_bid_case.txt</div>
+            <div class="doc-card-sub">48 KB · 1 知识块</div>
+            <div class="doc-card-tags"><span class="doc-tag">案例研究</span><span class="doc-tag">非标自动化</span></div>
+            <div class="embed-row">
+              <div class="embed-track"><div class="embed-fill done" style="width:100%"></div></div>
+              <span class="embed-badge done">已完成</span>
+            </div>
+          </div>
+          <div class="doc-card">
+            <div class="doc-type-icon doc-type-docx">
+              <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="1" width="16" height="20" rx="2"/><line x1="7" y1="8" x2="15" y2="8"/><line x1="7" y1="12" x2="15" y2="12"/><line x1="7" y1="16" x2="11" y2="16"/></svg>
+            </div>
+            <div class="doc-card-name">竞品对比分析报告.docx</div>
+            <div class="doc-card-sub">1.2 MB · 处理中</div>
+            <div class="doc-card-tags"><span class="doc-tag">竞品分析</span><span class="doc-tag">软件开发</span></div>
+            <div class="embed-row">
+              <div class="embed-track"><div class="embed-fill prog" style="width:45%"></div></div>
+              <span class="embed-badge prog">处理中</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ PAGE: Project Detail ═══ -->
+    <div id="page-detail" class="page">
+      <div class="topbar">
+        <button class="btn btn-ghost" onclick="show('projects',null);setNav(document.getElementById('nav-projects'))" style="padding:6px 10px;gap:5px">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="8,2 3,6.5 8,11"/></svg>
+          返回
+        </button>
+        <span class="topbar-sep">/</span>
+        <span class="topbar-title" style="font-size:14px">智慧园区综合管理平台</span>
+        <div class="topbar-flex"></div>
+        <button class="btn btn-ghost">📤 导出方案</button>
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="6"/><polygon points="5.5,4.5 10,7 5.5,9.5" fill="currentColor" stroke="none"/></svg>
+          开始排练
+        </button>
+      </div>
+      <div class="content" style="height:calc(100% - 52px);overflow:hidden;padding:16px;">
+        <div class="detail-layout" style="height:100%">
+
+          <!-- Slide list -->
+          <div class="slide-list">
+            <div style="font-size:11px;font-weight:700;color:var(--t-faint);text-transform:uppercase;letter-spacing:0.6px;padding:4px 8px 8px;border-bottom:1px solid var(--border-light);margin-bottom:6px;">幻灯片 · 12 页</div>
+            <div class="slide-item active">
+              <div class="slide-thumb"><div class="slide-thumb-overlay"><div class="slide-line"></div><div class="slide-line short"></div><div class="slide-line"></div></div></div>
+              <div class="slide-meta"><div class="slide-num">P1</div><div class="slide-title">封面 · 项目概述</div></div>
+              <div class="slide-score-dot good">87</div>
+            </div>
+            <div class="slide-item">
+              <div class="slide-thumb"><div class="slide-thumb-overlay"><div class="slide-line short"></div><div class="slide-line"></div><div class="slide-line short"></div></div></div>
+              <div class="slide-meta"><div class="slide-num">P2</div><div class="slide-title">需求理解</div></div>
+              <div class="slide-score-dot good">91</div>
+            </div>
+            <div class="slide-item">
+              <div class="slide-thumb" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A)"><div class="slide-thumb-overlay"><div class="slide-line"></div><div class="slide-line"></div></div></div>
+              <div class="slide-meta"><div class="slide-num">P3</div><div class="slide-title">技术方案架构</div></div>
+              <div class="slide-score-dot mid">72</div>
+            </div>
+            <div class="slide-item">
+              <div class="slide-thumb"><div class="slide-thumb-overlay"><div class="slide-line short"></div><div class="slide-line"></div></div></div>
+              <div class="slide-meta"><div class="slide-num">P4</div><div class="slide-title">核心功能模块</div></div>
+              <div class="slide-score-dot good">85</div>
+            </div>
+            <div class="slide-item">
+              <div class="slide-thumb"><div class="slide-thumb-overlay"><div class="slide-line"></div><div class="slide-line short"></div></div></div>
+              <div class="slide-meta"><div class="slide-num">P5</div><div class="slide-title">实施方案</div></div>
+              <div class="slide-score-dot none">—</div>
+            </div>
+            <div class="slide-item">
+              <div class="slide-thumb"><div class="slide-thumb-overlay"><div class="slide-line short"></div><div class="slide-line"></div><div class="slide-line short"></div></div></div>
+              <div class="slide-meta"><div class="slide-num">P6</div><div class="slide-title">项目团队</div></div>
+              <div class="slide-score-dot none">—</div>
+            </div>
+          </div>
+
+          <!-- Detail main -->
+          <div class="detail-main" style="overflow:hidden">
+            <div class="detail-tabs">
+              <div class="detail-tab active">📋 讲解方案</div>
+              <div class="detail-tab">🎤 排练记录</div>
+              <div class="detail-tab">🎵 AI 示范</div>
+              <div class="detail-tab">📖 跟读背诵</div>
+            </div>
+
+            <div class="plan-card" style="overflow-y:auto;max-height:calc(100vh - 200px)">
+              <div class="plan-card-head">
+                <div class="plan-page-badge">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#A5B4FC" stroke-width="1.6"><rect x="1" y="1" width="10" height="10" rx="1.2"/><line x1="3.5" y1="4" x2="8.5" y2="4"/><line x1="3.5" y1="6.5" x2="8.5" y2="6.5"/><line x1="3.5" y1="9" x2="6" y2="9"/></svg>
+                  <span>第 1 页 · 封面 &amp; 项目概述</span>
+                </div>
+                <div class="plan-slide-title">封面 · 项目概述</div>
+                <div class="plan-slide-meta">建议讲解时长：60–90 秒 · 就绪度 87%</div>
+              </div>
+              <div class="plan-body">
+                <div class="plan-section-label">核心讲解要点</div>
+                <div class="plan-points">
+                  <div class="plan-point">
+                    <span class="plan-point-num">01</span>
+                    <span>开场自我介绍：姓名 + 职位 + 在本项目中的角色（10秒内完成，语气自信，目光与评委接触）</span>
+                  </div>
+                  <div class="plan-point">
+                    <span class="plan-point-num">02</span>
+                    <span>公司一句话定位：突出"系统集成领域 15 年"和"华东区 TOP3 服务商"，锚定专业度</span>
+                  </div>
+                  <div class="plan-point">
+                    <span class="plan-point-num">03</span>
+                    <span>本次方案核心差异化：主动抛出"智慧运营中台 + 三网融合"两个关键词，勾起评委好奇心</span>
+                  </div>
+                  <div class="plan-point">
+                    <span class="plan-point-num">04</span>
+                    <span>议程预告：用"我将用 20 分钟为大家汇报三个部分……"过渡，给评委建立期待框架</span>
+                  </div>
+                </div>
+                <div class="plan-section-label" style="margin-top:16px">高频关键词</div>
+                <div class="plan-keywords">
+                  <span class="plan-kw highlight">智慧运营中台</span>
+                  <span class="plan-kw highlight">三网融合</span>
+                  <span class="plan-kw highlight">15年经验</span>
+                  <span class="plan-kw">数字孪生</span>
+                  <span class="plan-kw">IoT感知层</span>
+                  <span class="plan-kw">实施方法论</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+function show(page, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  if (btn) {
+    document.querySelectorAll('.demo-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  } else {
+    // update demo bar
+    const map = {projects:0,practice:1,recording:2,knowledge:3,detail:4};
+    const btns = document.querySelectorAll('.demo-btn');
+    btns.forEach(b => b.classList.remove('active'));
+    if (map[page] !== undefined) btns[map[page]].classList.add('active');
+  }
+}
+function setNav(el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if(el) el.classList.add('active');
+}
+</script>
+</body>
+</html>

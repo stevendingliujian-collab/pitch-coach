@@ -11,6 +11,11 @@ export interface PitchTask {
   status: number
   result: number | null
   owner_id: number
+  // extended fields (available from backend list response)
+  created_at?: string | null
+  page_count?: number | null
+  rehearsal_count?: number | null
+  readiness_score?: number | null
 }
 
 export interface PitchTaskCreate {

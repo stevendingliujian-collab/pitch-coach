@@ -84,6 +84,10 @@
       <template v-else-if="recorder.state.value === 'recording'">
         <div class="recording-controls">
           <el-button :icon="VideoPause" round @click="recorder.pause()">暂停</el-button>
+          <!-- CSS waveform animation -->
+          <div class="waveform-bars">
+            <div v-for="n in 14" :key="n" class="wave-bar" :style="`animation-delay:${(n-1)*0.06}s`" />
+          </div>
           <div class="recording-dot" />
           <el-button type="danger" :icon="CircleClose" round :loading="stopping"
             @click="stopAndSubmit">
@@ -306,13 +310,14 @@ function importanceType(level: number): '' | 'success' | 'warning' | 'danger' | 
 .project-name { font-size: 14px; color: #a0aec0; }
 
 .timer {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 900;
   font-variant-numeric: tabular-nums;
-  color: #4a5568;
-  letter-spacing: 2px;
+  color: rgba(255,255,255,0.2);
+  letter-spacing: -1px;
+  transition: color 0.3s;
 }
-.timer.recording { color: #fc8181; }
+.timer.recording { color: #fff; }
 
 .main-area {
   flex: 1;
@@ -452,17 +457,26 @@ function importanceType(level: number): '' | 'success' | 'warning' | 'danger' | 
 .recording-controls { display: flex; align-items: center; gap: 16px; }
 
 .recording-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
+  width: 10px; height: 10px; border-radius: 50%;
   background: #fc8181;
-  animation: blink 1s infinite;
+  box-shadow: 0 0 8px rgba(252,129,129,0.8);
+  animation: blink 1.2s ease-in-out infinite;
+  flex-shrink: 0;
 }
 
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.2; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* V2 waveform inside recording bar */
+.waveform-bars {
+  display: flex; align-items: center; gap: 3px; height: 36px;
 }
+.wave-bar {
+  width: 3px; border-radius: 2px;
+  background: linear-gradient(180deg, #818CF8, rgba(99,102,241,0.3));
+  animation: wave 0.85s ease-in-out infinite;
+  height: 8px;
+}
+@keyframes wave { 0%,100%{height:6px} 50%{height:30px} }
 
 .uploading, .upload-done {
   display: flex;

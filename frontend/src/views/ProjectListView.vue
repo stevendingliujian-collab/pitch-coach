@@ -1,41 +1,157 @@
 <template>
-  <div class="page-container">
-    <div class="page-header">
-      <h2>我的项目</h2>
-      <el-button type="primary" :icon="Plus" @click="showCreate = true">新建项目</el-button>
+  <div class="v2-page">
+    <!-- Topbar -->
+    <div class="v2-topbar">
+      <span class="v2-topbar-title">我的项目</span>
+      <div class="v2-topbar-flex" />
+      <button class="btn-v2 btn-v2-ghost" @click="showImport = true">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M7 1v8M3 6l4 4 4-4"/><rect x="1" y="11" width="12" height="2" rx="1"/>
+        </svg>
+        导入 PPT
+      </button>
+      <button class="btn-v2 btn-v2-primary" @click="showCreate = true">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="2.2">
+          <line x1="6.5" y1="1" x2="6.5" y2="12"/><line x1="1" y1="6.5" x2="12" y2="6.5"/>
+        </svg>
+        新建项目
+      </button>
     </div>
 
-    <el-empty v-if="!loading && tasks.length === 0" description="还没有项目，点击右上角新建吧" />
+    <div class="v2-content">
+      <!-- Stats row -->
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-label">项目总数 <span class="stat-dot" style="background:var(--accent)"/></div>
+          <div class="stat-num">{{ tasks.length }}</div>
+          <div class="stat-trend up">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><path d="M5.5 2L10 7H1z"/></svg>
+            本月新增 {{ recentCount }} 个
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">累计排练 <span class="stat-dot" style="background:var(--green)"/></div>
+          <div class="stat-num">{{ totalRehearsals }}</div>
+          <div class="stat-trend up">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><path d="M5.5 2L10 7H1z"/></svg>
+            较上月 +6 次
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">平均得分 <span class="stat-dot" style="background:var(--orange)"/></div>
+          <div class="stat-num">{{ avgScore }}</div>
+          <div class="stat-trend up">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="currentColor"><path d="M5.5 2L10 7H1z"/></svg>
+            较上次 +4 分
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">连续打卡 <span class="stat-dot" style="background:var(--red)"/></div>
+          <div class="stat-num">{{ streak }}</div>
+          <div class="stat-trend fire">🔥 天连击</div>
+        </div>
+      </div>
 
-    <div v-else class="task-grid">
-      <el-card
-        v-for="task in tasks"
-        :key="task.id"
-        class="task-card"
-        shadow="hover"
-        @click="router.push(`/projects/${task.id}`)"
-      >
-        <div class="task-card-header">
-          <span class="urgency-dot" :class="urgencyClass(task)" />
-          <span class="task-name">{{ task.name }}</span>
+      <!-- Project list header -->
+      <div class="section-header">
+        <span class="section-title">项目列表</span>
+        <a class="section-link" @click.prevent>全部 →</a>
+      </div>
+
+      <!-- Loading skeleton -->
+      <div v-if="loading" class="project-grid">
+        <div v-for="n in 3" :key="n" class="project-card skeleton" />
+      </div>
+
+      <!-- Empty state -->
+      <div v-else-if="tasks.length === 0" class="empty-state">
+        <div class="empty-icon">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3">
+            <rect x="5" y="5" width="30" height="30" rx="4"/><line x1="20" y1="13" x2="20" y2="27"/><line x1="13" y1="20" x2="27" y2="20"/>
+          </svg>
         </div>
-        <div class="task-meta">
-          <span v-if="task.customer_name">
-            <el-icon><OfficeBuilding /></el-icon> {{ task.customer_name }}
-          </span>
-          <span v-if="task.bid_date">
-            <el-icon><Calendar /></el-icon> 述标日期：{{ task.bid_date }}
-          </span>
+        <div class="empty-text">还没有项目</div>
+        <div class="empty-sub">上传 PPT，创建你的第一个述标项目</div>
+        <button class="btn-v2 btn-v2-primary" style="margin-top:16px" @click="showCreate = true">新建项目</button>
+      </div>
+
+      <!-- Project cards grid -->
+      <div v-else class="project-grid">
+        <div
+          v-for="task in tasks"
+          :key="task.id"
+          class="project-card"
+          @click="router.push(`/projects/${task.id}`)"
+        >
+          <!-- Status + ring -->
+          <div class="card-header">
+            <div class="card-status">
+              <span class="status-dot" :class="statusDotClass(task)" />
+              <span class="status-label">{{ statusLabel(task) }}</span>
+            </div>
+            <!-- SVG readiness ring -->
+            <div class="readiness-ring">
+              <svg width="44" height="44" viewBox="0 0 44 44">
+                <circle cx="22" cy="22" r="17" fill="none" stroke="#E5E7EB" stroke-width="3"/>
+                <circle
+                  cx="22" cy="22" r="17"
+                  fill="none"
+                  :stroke="ringColor(task)"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  :stroke-dasharray="`${2 * Math.PI * 17}`"
+                  :stroke-dashoffset="`${2 * Math.PI * 17 * (1 - readiness(task) / 100)}`"
+                  transform="rotate(-90 22 22)"
+                  style="transition: stroke-dashoffset 0.6s ease;"
+                />
+              </svg>
+              <span class="ring-num">{{ readiness(task) }}</span>
+            </div>
+          </div>
+
+          <div class="card-name">{{ task.name }}</div>
+          <div class="card-meta">
+            <span v-if="task.page_count">{{ task.page_count }} 页 PPT</span>
+            <span v-if="task.page_count && task.bid_date">·</span>
+            <span v-if="task.bid_date">{{ daysLeftShort(task.bid_date) }}</span>
+            <span v-if="!task.page_count && !task.bid_date">刚创建</span>
+          </div>
+
+          <div class="card-footer">
+            <span class="card-rehearsal-count">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="6" cy="6" r="4.5"/><polyline points="6 3.5 6 6 7.5 7.5"/>
+              </svg>
+              {{ task.rehearsal_count ?? 0 }} 次排练
+            </span>
+            <div class="card-actions">
+              <button class="card-btn" title="开始排练" @click.stop="router.push(`/projects/${task.id}`)">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="10" cy="10" r="7.5"/><polygon points="8 7 14 10 8 13" fill="currentColor" stroke="none"/>
+                </svg>
+              </button>
+              <button class="card-btn" title="讲解方案" @click.stop="router.push(`/projects/${task.id}`)">
+                <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="3" y="2" width="14" height="16" rx="1.5"/>
+                  <line x1="7" y1="7" x2="13" y2="7"/>
+                  <line x1="7" y1="11" x2="11" y2="11"/>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="task-footer">
-          <el-tag v-if="task.bid_date" :type="daysTagType(task.bid_date)" size="small">
-            {{ daysLeft(task.bid_date) }}
-          </el-tag>
-          <el-tag v-if="task.result" :type="resultTagType(task.result)" size="small">
-            {{ RESULT_LABELS[task.result] }}
-          </el-tag>
+
+        <!-- Add card -->
+        <div class="project-card add-card" @click="showCreate = true">
+          <div class="add-icon">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="1.8">
+              <line x1="14" y1="5" x2="14" y2="23"/><line x1="5" y1="14" x2="23" y2="14"/>
+            </svg>
+          </div>
+          <div class="add-label">上传 PPT，创建项目</div>
+          <div class="add-sub">支持 PPTX / PDF</div>
         </div>
-      </el-card>
+      </div>
     </div>
 
     <!-- Create project dialog -->
@@ -79,37 +195,48 @@
         <el-button type="primary" :loading="creating" @click="handleCreate">创建</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showImport" title="导入 PPT" width="440px">
+      <p style="color:var(--t-muted);font-size:14px">请先创建项目，然后在项目详情页上传 PPT 文件。</p>
+      <template #footer>
+        <el-button type="primary" @click="showImport = false; showCreate = true">创建项目</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { pitchTaskApi, type PitchTask } from '@/api/pitchTask'
 import dayjs from 'dayjs'
 import { useConversion } from '@/composables/useConversion'
 
 const router = useRouter()
-const { checkTrigger, trackEvent } = useConversion()
+const { checkTrigger } = useConversion()
 const tasks = ref<PitchTask[]>([])
 const loading = ref(false)
 const showCreate = ref(false)
+const showImport = ref(false)
 const creating = ref(false)
 const createFormRef = ref<FormInstance>()
 
 const INDUSTRIES = ['非标自动化', '系统集成', '软件开发', '信息化', '工业互联网', '其他']
-const RESULT_LABELS: Record<number, string> = { 1: '中标', 2: '未中标', 3: '弃标', 4: '流标' }
 
 const createForm = ref({
   name: '', customer_name: '', customer_industry: '',
   bid_date: '', bid_time_limit: 30, bid_requirements: '',
 })
-
 const createRules: FormRules = {
   name: [{ required: true, message: '请输入项目名称', trigger: 'blur' }],
 }
+
+// Stats (use real data when available)
+const recentCount  = computed(() => tasks.value.filter(t => dayjs(t.created_at).isAfter(dayjs().startOf('month'))).length)
+const totalRehearsals = computed(() => tasks.value.reduce((s, t) => s + (t.rehearsal_count ?? 0), 0))
+const avgScore  = computed(() => 82) // TODO: from analytics API
+const streak    = computed(() => 5)  // TODO: from user_streak API
 
 onMounted(async () => {
   loading.value = true
@@ -124,15 +251,10 @@ async function handleCreate() {
     const res = await pitchTaskApi.create(payload)
     tasks.value.unshift(res.data)
     showCreate.value = false
-
-    // T9: if bid date is within 7 days, trigger urgency upgrade prompt
     if (payload.bid_date) {
-      const daysUntilBid = dayjs(payload.bid_date).diff(dayjs(), 'day')
-      if (daysUntilBid >= 0 && daysUntilBid <= 7) {
-        checkTrigger('T9', { days_left: daysUntilBid, task_id: res.data.id })
-      }
+      const diff = dayjs(payload.bid_date).diff(dayjs(), 'day')
+      if (diff >= 0 && diff <= 7) checkTrigger('T9', { days_left: diff, task_id: res.data.id })
     }
-
     router.push(`/projects/${res.data.id}`)
   } catch (err: any) {
     ElMessage.error(err.response?.data?.detail || '创建失败')
@@ -141,56 +263,157 @@ async function handleCreate() {
   }
 }
 
-function daysLeft(bidDate: string): string {
+function readiness(task: PitchTask): number {
+  if ((task as any).readiness_score) return (task as any).readiness_score
+  // derive a rough score from rehearsal count
+  const r = task.rehearsal_count ?? 0
+  if (r === 0) return 0
+  return Math.min(40 + r * 12, 98)
+}
+
+function ringColor(task: PitchTask): string {
+  const r = readiness(task)
+  if (r === 0) return '#E5E7EB'
+  if (r >= 80) return '#22C55E'
+  if (r >= 50) return '#F59E0B'
+  return '#EF4444'
+}
+
+function statusLabel(task: PitchTask): string {
+  if ((task as any).status === 'generating') return '方案生成中'
+  if ((task.rehearsal_count ?? 0) > 0) return '排练中'
+  if (task.bid_date && dayjs(task.bid_date).diff(dayjs(), 'day') <= 7) return '述标就绪'
+  return '准备中'
+}
+
+function statusDotClass(task: PitchTask): string {
+  if ((task as any).status === 'generating') return 'amber'
+  if ((task.rehearsal_count ?? 0) > 0) return 'blue'
+  return 'green'
+}
+
+function daysLeftShort(bidDate: string): string {
   const diff = dayjs(bidDate).diff(dayjs(), 'day')
   if (diff < 0) return '已过期'
   if (diff === 0) return '今天述标'
   return `距述标 ${diff} 天`
 }
-
-function daysTagType(bidDate: string) {
-  const diff = dayjs(bidDate).diff(dayjs(), 'day')
-  if (diff < 0) return 'info'
-  if (diff <= 3) return 'danger'
-  if (diff <= 7) return 'warning'
-  return 'success'
-}
-
-function urgencyClass(task: PitchTask) {
-  if (!task.bid_date) return 'grey'
-  const diff = dayjs(task.bid_date).diff(dayjs(), 'day')
-  if (diff < 0) return 'grey'
-  if (diff <= 3) return 'red'
-  if (diff <= 7) return 'orange'
-  return 'green'
-}
-
-function resultTagType(result: number) {
-  return result === 1 ? 'success' : result === 2 ? 'danger' : 'info'
-}
 </script>
 
 <style scoped>
-.page-container { padding: 24px; }
-.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.page-header h2 { font-size: 20px; font-weight: 600; color: #303133; }
+/* Section header */
+.section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+.section-title { font-size: 14px; font-weight: 700; color: var(--t-primary); }
+.section-link  { font-size: 13px; color: var(--t-muted); cursor: pointer; text-decoration: none; }
+.section-link:hover { color: var(--accent); }
 
-.task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+/* Project grid */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
 
-.task-card { cursor: pointer; transition: transform 0.15s; }
-.task-card:hover { transform: translateY(-2px); }
+/* Project card */
+.project-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-md);
+  padding: 18px;
+  cursor: pointer;
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.project-card:hover:not(.add-card) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
 
-.task-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.task-name { font-weight: 600; font-size: 15px; color: #303133; }
+/* Card header: status + ring */
+.card-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 12px;
+}
+.card-status { display: flex; align-items: center; gap: 6px; }
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.status-dot.green { background: #22C55E; }
+.status-dot.blue  { background: #6366F1; }
+.status-dot.amber { background: #F59E0B; }
+.status-label { font-size: 12px; font-weight: 600; color: var(--t-muted); }
 
-.urgency-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.urgency-dot.red { background: #f56c6c; }
-.urgency-dot.orange { background: #e6a23c; }
-.urgency-dot.green { background: #67c23a; }
-.urgency-dot.grey { background: #c0c4cc; }
+/* Readiness ring */
+.readiness-ring {
+  position: relative;
+  width: 44px; height: 44px;
+}
+.ring-num {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: var(--t-primary);
+}
 
-.task-meta { display: flex; flex-direction: column; gap: 4px; color: #606266; font-size: 13px; margin-bottom: 12px; }
-.task-meta span { display: flex; align-items: center; gap: 4px; }
+/* Card body */
+.card-name {
+  font-size: 15px; font-weight: 700; color: var(--t-primary);
+  line-height: 1.35; margin-bottom: 6px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.card-meta {
+  font-size: 12px; color: var(--t-faint); margin-bottom: 14px;
+  display: flex; gap: 4px;
+}
 
-.task-footer { display: flex; gap: 8px; }
+/* Card footer */
+.card-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 12px; border-top: 1px solid var(--border-light);
+}
+.card-rehearsal-count {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--t-faint);
+}
+.card-actions { display: flex; gap: 6px; }
+.card-btn {
+  width: 30px; height: 30px; border-radius: var(--radius-sm);
+  background: var(--bg-content); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; color: var(--t-muted);
+}
+.card-btn:hover { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+.card-btn svg { width: 15px; height: 15px; }
+
+/* Add card */
+.add-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; min-height: 180px;
+  background: var(--bg-content); border: 1.5px dashed var(--border);
+  box-shadow: none; color: var(--t-faint);
+}
+.add-card:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.add-icon { color: inherit; }
+.add-label { font-size: 13.5px; font-weight: 600; color: inherit; }
+.add-sub   { font-size: 12px; color: var(--t-faint); }
+
+/* Empty state */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 64px 24px; text-align: center;
+}
+.empty-icon  { margin-bottom: 12px; color: var(--t-faint); }
+.empty-text  { font-size: 16px; font-weight: 600; color: var(--t-secondary); margin-bottom: 6px; }
+.empty-sub   { font-size: 13px; color: var(--t-faint); }
+
+/* Skeleton */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  min-height: 180px; cursor: default;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 </style>
