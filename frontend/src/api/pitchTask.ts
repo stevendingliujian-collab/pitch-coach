@@ -16,6 +16,25 @@ export interface PitchTask {
   page_count?: number | null
   rehearsal_count?: number | null
   readiness_score?: number | null
+  best_score?: number | null
+}
+
+export interface ReadinessStep {
+  key: string
+  label: string
+  desc: string
+  done: boolean
+  action_tab: string | null
+}
+
+export interface TaskReadiness {
+  task_id: number
+  task_name: string
+  bid_date: string | null
+  done_count: number
+  total_steps: number
+  progress_pct: number
+  steps: ReadinessStep[]
 }
 
 export interface PitchTaskCreate {
@@ -33,6 +52,8 @@ export const pitchTaskApi = {
   list: () => api.get<PitchTask[]>('/pitch-tasks'),
   get: (id: number) => api.get<PitchTask>(`/pitch-tasks/${id}`),
   create: (data: PitchTaskCreate) => api.post<PitchTask>('/pitch-tasks', data),
-  update: (id: number, data: Partial<PitchTaskCreate>) => api.patch<PitchTask>(`/pitch-tasks/${id}`, data),
+  update: (id: number, data: Partial<PitchTaskCreate> & { result?: number }) => api.patch<PitchTask>(`/pitch-tasks/${id}`, data),
+  setOutcome: (id: number, result: number) => api.patch<PitchTask>(`/pitch-tasks/${id}/outcome`, { result }),
+  readiness: (id: number) => api.get<TaskReadiness>(`/pitch-tasks/${id}/readiness`),
   archive: (id: number) => api.delete(`/pitch-tasks/${id}`),
 }

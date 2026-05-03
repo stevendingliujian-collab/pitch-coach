@@ -86,8 +86,13 @@
           <!-- Status + ring -->
           <div class="card-header">
             <div class="card-status">
-              <span class="status-dot" :class="statusDotClass(task)" />
-              <span class="status-label">{{ statusLabel(task) }}</span>
+              <span v-if="task.result" :class="['result-badge', resultClass(task.result)]">
+                {{ resultText(task.result) }}
+              </span>
+              <template v-else>
+                <span class="status-dot" :class="statusDotClass(task)" />
+                <span class="status-label">{{ statusLabel(task) }}</span>
+              </template>
             </div>
             <!-- SVG readiness ring -->
             <div class="readiness-ring">
@@ -379,6 +384,14 @@ function statusDotClass(task: PitchTask): string {
   return 'green'
 }
 
+function resultText(result: number): string {
+  return { 1: '中标 ✅', 2: '未中标 ❌', 3: '弃标', 4: '流标' }[result] ?? ''
+}
+
+function resultClass(result: number): string {
+  return { 1: 'won', 2: 'lost', 3: 'withdrawn', 4: 'void' }[result] ?? ''
+}
+
 function daysLeftShort(bidDate: string): string {
   const diff = dayjs(bidDate).diff(dayjs(), 'day')
   if (diff < 0) return '已过期'
@@ -432,6 +445,13 @@ function daysLeftShort(bidDate: string): string {
 .status-dot.blue  { background: #6366F1; }
 .status-dot.amber { background: #F59E0B; }
 .status-label { font-size: 12px; font-weight: 600; color: var(--t-muted); }
+
+/* Result badge */
+.result-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+.result-badge.won        { background: #DCFCE7; color: #16a34a; }
+.result-badge.lost       { background: #FEE2E2; color: #DC2626; }
+.result-badge.withdrawn  { background: #F3F4F6; color: #6b7280; }
+.result-badge.void       { background: #FEF3C7; color: #92400E; }
 
 /* Readiness ring */
 .readiness-ring {

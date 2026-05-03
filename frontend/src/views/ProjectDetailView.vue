@@ -44,12 +44,13 @@
       <el-skeleton :rows="8" animated />
     </div>
     <div v-else class="pd-tab-content">
-      <PlanTab      v-if="activeTab === 'plan'"      :task="task!" :plan="currentPlan" @plan-created="onPlanCreated" />
-      <NarrationTab v-if="activeTab === 'narration'" :plan="currentPlan" :pages="currentPlan?.pages ?? []" />
-      <RehearsalTab v-if="activeTab === 'rehearsal'" :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
-      <TrainingTab  v-if="activeTab === 'training'"  :task-id="taskId" :plan-id="currentPlan?.id ?? null" :pages="currentPlan?.pages ?? []" />
-      <ReviewTab    v-if="activeTab === 'review'"    :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
-      <RubricTab    v-if="activeTab === 'rubric'"    :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
+      <PlanTab       v-if="activeTab === 'plan'"      :task="task!" :plan="currentPlan" @plan-created="onPlanCreated" />
+      <NarrationTab  v-if="activeTab === 'narration'" :plan="currentPlan" :pages="currentPlan?.pages ?? []" />
+      <RehearsalTab  v-if="activeTab === 'rehearsal'" :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
+      <TrainingTab   v-if="activeTab === 'training'"  :task-id="taskId" :plan-id="currentPlan?.id ?? null" :pages="currentPlan?.pages ?? []" />
+      <ReviewTab     v-if="activeTab === 'review'"    :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
+      <RubricTab     v-if="activeTab === 'rubric'"    :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
+      <ReadinessTab  v-if="activeTab === 'readiness'" :task-id="taskId" :task="task" @switch-tab="activeTab = $event" @task-updated="task = $event" />
     </div>
   </div>
 </template>
@@ -66,6 +67,7 @@ import RehearsalTab from '@/components/RehearsalTab.vue'
 import TrainingTab  from '@/components/TrainingTab.vue'
 import ReviewTab    from '@/components/ReviewTab.vue'
 import RubricTab    from '@/components/RubricTab.vue'
+import ReadinessTab from '@/components/ReadinessTab.vue'
 
 const route   = useRoute()
 const router  = useRouter()
@@ -105,6 +107,11 @@ const tabs = [
     key: 'rubric',
     label: '评分对标',
     icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="1" width="10" height="12" rx="1"/><line x1="4" y1="5" x2="10" y2="5"/><line x1="4" y1="8" x2="10" y2="8"/><polyline points="6 10 8 12 12 8"/></svg>`,
+  },
+  {
+    key: 'readiness',
+    label: '就绪清单',
+    icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5.5"/><polyline points="4 7 6 9.5 10.5 4.5"/></svg>`,
   },
 ]
 
