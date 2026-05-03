@@ -22,7 +22,35 @@ class Settings(BaseSettings):
     # JWT
     secret_key: str = "change-me-in-production"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 1440  # 24 hours
+    access_token_expire_minutes: int = 120   # 2 hours (设计文档要求)
+    refresh_token_expire_days: int = 30
+
+    # SMS 验证码
+    sms_provider: str = "stub"               # stub（开发）/ aliyun / tencent
+    sms_access_key: str = ""
+    sms_secret_key: str = ""
+    sms_sign_name: str = "OTD述标教练"
+    sms_template_id: str = ""
+    sms_code_ttl: int = 300                  # 5 分钟
+    sms_resend_interval: int = 60            # 60s 内不可重发
+    sms_ip_rate_limit: int = 5               # 同 IP 10 分钟内最多 5 条
+
+    # 微信开放平台（PC 扫码登录）
+    wechat_app_id: str = ""
+    wechat_app_secret: str = ""
+    wechat_redirect_uri: str = "http://localhost:5173/auth/wechat/callback"
+    wechat_qrcode_ttl: int = 300             # 二维码 5 分钟过期
+
+    # 企业微信（P1）
+    wecom_corp_id: str = ""
+    wecom_agent_id: str = ""
+    wecom_secret: str = ""
+    wecom_redirect_uri: str = "http://localhost:5173/auth/wecom/callback"
+
+    # 飞书（P1）
+    feishu_app_id: str = ""
+    feishu_app_secret: str = ""
+    feishu_redirect_uri: str = "http://localhost:5173/auth/feishu/callback"
 
     # LLM (DashScope / Qwen)
     llm_api_key: str = ""

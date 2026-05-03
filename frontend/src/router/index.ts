@@ -4,9 +4,11 @@ import { useAuthStore } from '@/stores/auth'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    // Auth
-    { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { public: true } },
-    { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { public: true } },
+    // Auth — unified login / register
+    { path: '/auth', name: 'auth', component: () => import('@/views/AuthView.vue'), meta: { public: true } },
+    // Legacy redirects
+    { path: '/login', redirect: '/auth' },
+    { path: '/register', redirect: '/auth' },
 
     // Standalone mode
     { path: '/', redirect: '/projects' },
@@ -29,7 +31,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   if (to.meta.public) return true
   const auth = useAuthStore()
-  if (!auth.token) return { name: 'login', query: { redirect: to.fullPath } }
+  if (!auth.token) return { name: 'auth', query: { redirect: to.fullPath } }
 })
 
 export default router
