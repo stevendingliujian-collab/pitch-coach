@@ -126,6 +126,7 @@ import {
   ArrowLeft, ArrowRight, FullScreen, Close, VideoPlay, VideoPause,
   CircleClose, Document, Picture, ChatLineRound, SuccessFilled,
 } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { pitchTaskApi } from '@/api/pitchTask'
 import { pitchPlanApi, type PlanPage } from '@/api/pitchPlan'
 import { rehearsalApi } from '@/api/rehearsal'
@@ -181,8 +182,13 @@ async function startRecording() {
     ;(window as any).__rehearsal_upload_url = res.data.upload_url
 
     await recorder.start(pages.value[0]?.page_number ?? 1)
-  } catch (e) {
-    console.error('start recording failed', e)
+  } catch (e: any) {
+    const msg = e?.name === 'NotFoundError'
+      ? '未找到麦克风，请连接麦克风后重试'
+      : e?.name === 'NotAllowedError'
+        ? '请允许浏览器使用麦克风'
+        : `录音启动失败：${e?.message ?? e}`
+    ElMessage.error(msg)
   } finally {
     starting.value = false
   }
@@ -218,8 +224,8 @@ async function stopAndSubmit() {
     })
 
     startPolling()
-  } catch (e) {
-    console.error('submit rehearsal failed', e)
+  } catch (e: any) {
+    ElMessage.error(`提交排练失败：${e?.response?.data?.detail ?? e?.message ?? e}`)
   } finally {
     stopping.value = false
   }

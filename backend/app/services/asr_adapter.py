@@ -36,8 +36,8 @@ async def _transcribe_whisper(audio_bytes: bytes, language: str) -> TranscriptSe
     from app.core.config import settings
 
     client = openai.AsyncOpenAI(
-        api_key=settings.openai_api_key or settings.deepseek_api_key,
-        base_url=settings.whisper_api_base or None,
+        api_key=settings.llm_api_key,
+        base_url=None,
     )
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
         tmp.write(audio_bytes)
