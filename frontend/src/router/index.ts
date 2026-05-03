@@ -32,6 +32,8 @@ const router = createRouter({
     { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
     // P3 F7 AI 复盘助手
     { path: '/post-mortem', name: 'postMortem', component: () => import('@/views/PostMortemView.vue') },
+    // P3 Open API management
+    { path: '/open-api', name: 'openApi', component: () => import('@/views/OpenApiView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },

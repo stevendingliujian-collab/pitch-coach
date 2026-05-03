@@ -100,6 +100,16 @@
           <span>AI 复盘助手</span>
           <span class="nav-badge elite">旗舰版</span>
         </router-link>
+
+        <router-link to="/open-api" class="nav-item" :class="{ active: isActive('/open-api') }" data-label="Open API">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+            <rect x="2" y="3" width="16" height="11" rx="1.5"/>
+            <path d="M6.5 7.5h.5M9 7.5h2M6.5 10.5h.5M9 10.5h5"/>
+            <path d="M7 17h6M10 14v3"/>
+          </svg>
+          <span>Open API</span>
+          <span class="nav-badge elite">旗舰版</span>
+        </router-link>
       </div>
 
       <div class="nav-section">
