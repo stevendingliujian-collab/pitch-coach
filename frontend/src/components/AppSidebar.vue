@@ -78,6 +78,18 @@
           <span>进步看板</span>
           <span class="nav-badge pro">专业版</span>
         </div>
+
+        <router-link to="/evaluator" class="nav-item" :class="{ active: isActive('/evaluator') }" data-label="评委模拟">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7">
+            <circle cx="10" cy="7" r="3.5"/>
+            <path d="M4 17c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+            <circle cx="16" cy="7" r="2.5" stroke-width="1.5"/>
+            <line x1="16" y1="11" x2="16" y2="14"/>
+            <line x1="14.5" y1="12.5" x2="17.5" y2="12.5"/>
+          </svg>
+          <span>评委模拟</span>
+          <span class="nav-badge pro">专业版</span>
+        </router-link>
       </div>
 
       <div class="nav-section">

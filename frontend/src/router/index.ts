@@ -24,6 +24,8 @@ const router = createRouter({
     { path: '/daily-practice', name: 'dailyPractice', component: () => import('@/views/DailyPracticeView.vue') },
     // P2 Pricing
     { path: '/pricing', name: 'pricing', component: () => import('@/views/PricingView.vue') },
+    // P2 F4 Evaluator simulation
+    { path: '/evaluator', name: 'evaluator', component: () => import('@/views/EvaluatorView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },
