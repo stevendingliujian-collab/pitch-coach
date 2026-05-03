@@ -35,6 +35,11 @@ INDUSTRIES = {
     "software_dev": "软件开发",
     "automation": "非标自动化",
     "general": "通用能力",
+    "healthcare_it": "医疗信息化",
+    "gov_digital": "政务数字化",
+    "education": "教育信息化",
+    "energy": "能源电力",
+    "fintech": "金融科技",
 }
 
 
