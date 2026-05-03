@@ -337,7 +337,12 @@ def _score_originality(speech_text: str, plan_pages: list[dict]) -> OriginalityR
     Uses 4-gram overlap ratio.
     """
     ppt_text = " ".join(
-        str(p.get("content", "")) + " " + str(p.get("key_points", "") or "")
+        str(p.get("page_content_summary", p.get("content", "")) or "") + " " +
+        str(p.get("key_points", "") or "") + " " +
+        " ".join(
+            str(tp.get("point", "") if isinstance(tp, dict) else tp)
+            for tp in (p.get("talking_points") or [])
+        )
         for p in plan_pages
     )
     speech_ngrams = _extract_ngrams(speech_text, 4)
@@ -364,8 +369,8 @@ def _score_originality(speech_text: str, plan_pages: list[dict]) -> OriginalityR
 
 # Compliance risk patterns for 述标 context
 _COMPLIANCE_PATTERNS: list[tuple[str, str]] = [
-    (r"保证[一-龥]*第一|一定会赢|百分之百|必[一-龥]*中标", "投标禁语（不当承诺）"),
-    (r"已经跑通|内部消息|关系[一-龥]*打点|找关系", "合规风险（暗示关系营销）"),
+    (r"保证[一-龥]*第一|一定会赢|百分之百|必[一-龥]*中标|肯定[一-龥]*能中|必然中标|一定中标|肯定中|肯定能赢|稳赢|稳中", "投标禁语（不当承诺）"),
+    (r"已经跑通|内部消息|关系[一-龥]*打点|找关系|和[一-龥]*领导[一-龥]*关系", "合规风险（暗示关系营销）"),
     (r"竞争对手[一-龥]{0,4}烂|竞争对手[一-龥]{0,4}差劲", "竞品诋毁"),
     (r"价格[一-龥]{0,4}随便|可以[一-龥]{0,4}返点|回扣", "价格合规风险"),
 ]

@@ -3,7 +3,10 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.services.scoring_engine import score_rehearsal, _score_filler, _score_rate, _score_timing
+from app.services.scoring_engine import (
+    score_rehearsal, _score_filler, _score_rate, _score_timing,
+    _score_originality, _score_compliance, _score_pauses, _extract_ngrams,
+)
 
 
 def test_filler_no_fillers():
@@ -87,6 +90,84 @@ def test_full_score_with_fillers():
     assert any("填充词" in tip for tip in result.improvement_tips)
 
 
+# ── New 6-dimension tests ─────────────────────────────────────────────────
+
+def test_ngrams_basic():
+    grams = _extract_ngrams("abcde", n=3)
+    assert "abc" in grams
+    assert "bcd" in grams
+    assert "cde" in grams
+    assert len(grams) == 3
+
+
+def test_originality_high_overlap():
+    # Speech is identical to PPT → low originality score
+    ppt_text = "我们的系统集成方案采用了业界领先的技术架构和模块化设计"
+    plan_pages = [{"page_content_summary": ppt_text}]
+    result = _score_originality(ppt_text, plan_pages)
+    assert result.overlap_ratio >= 0.8
+    assert result.score <= 75
+
+
+def test_originality_low_overlap():
+    ppt_text = "产品特性概述"
+    speech = "通过实际案例，我们可以看到该方案在多个项目中成功落地并创造了显著价值"
+    plan_pages = [{"page_content_summary": ppt_text}]
+    result = _score_originality(speech, plan_pages)
+    assert result.overlap_ratio < 0.3
+    assert result.score >= 90
+
+
+def test_compliance_clean():
+    result = _score_compliance("我们的解决方案完全符合招投标要求，价格透明合理")
+    assert result.violations == []
+    assert result.score == 100.0
+
+
+def test_compliance_violations():
+    result = _score_compliance("我保证这个项目我们肯定能中，另外和某些领导有很好的关系")
+    assert len(result.violations) >= 1
+    assert result.score < 100
+
+
+def test_pauses_no_pauses():
+    segments = [
+        {"start": 0, "end": 2},
+        {"start": 2, "end": 4},
+        {"start": 4, "end": 6},
+    ]
+    result = _score_pauses(segments)
+    assert result.long_pause_count == 0
+    assert result.score == 100.0
+
+
+def test_pauses_long_pause():
+    segments = [
+        {"start": 0, "end": 2},
+        {"start": 7, "end": 9},   # 5s gap — long pause
+    ]
+    result = _score_pauses(segments)
+    assert result.long_pause_count == 1
+    assert result.score < 100
+
+
+def test_full_score_includes_new_dimensions():
+    segments = [{"text": "今天我来介绍一个创新性的解决方案" * 5, "start": 0, "end": 60}]
+    page_timings = [{"page_number": 1, "start_sec": 0, "end_sec": 60}]
+    plan_pages = [{"page_number": 1, "importance_level": 3, "suggested_duration_sec": 60,
+                   "page_content_summary": "创新解决方案介绍"}]
+    result = score_rehearsal(
+        transcript_segments=segments,
+        page_timings=page_timings,
+        plan_pages=plan_pages,
+        target_duration_sec=60,
+    )
+    assert result.originality_score is not None
+    assert result.compliance_score is not None
+    assert result.pause_score is not None
+    assert 0 <= result.total_score <= 100
+
+
 if __name__ == "__main__":
     tests = [
         test_filler_no_fillers,
@@ -98,6 +179,14 @@ if __name__ == "__main__":
         test_timing_overtime,
         test_full_score_clean,
         test_full_score_with_fillers,
+        test_ngrams_basic,
+        test_originality_high_overlap,
+        test_originality_low_overlap,
+        test_compliance_clean,
+        test_compliance_violations,
+        test_pauses_no_pauses,
+        test_pauses_long_pause,
+        test_full_score_includes_new_dimensions,
     ]
     passed = 0
     failed = 0
