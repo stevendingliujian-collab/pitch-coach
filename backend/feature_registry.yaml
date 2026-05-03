@@ -1,0 +1,85 @@
+# Feature Registry — 套餐 × 功能 × 额度配置
+#
+# structure:
+#   features:
+#     <feature_key>:
+#       label: 人可读标签（用于错误提示）
+#       plans:
+#         free:      月度限额（null = 无限，0 = 完全禁用）
+#         pro:       月度限额（null = 无限，0 = 完全禁用）
+#         elite:     月度限额
+#         enterprise: 月度限额
+#       trigger_id: 转化触发点 ID（显示升级横幅）
+#       gated_method: POST | GET | PUT | DELETE（路由拦截方法）
+#       gated_path:   API 路径前缀（用于中间件匹配）
+#
+# 修改此文件即可调整套餐额度，无需改代码。
+# 服务器重启后生效。
+
+features:
+
+  ppt_uploads:
+    label: "PPT 上传（免费版 3 份/月）"
+    plans:
+      free: 3
+      pro: null       # unlimited
+      elite: null
+      enterprise: null
+    trigger_id: "T2"
+    gated_method: "POST"
+    gated_path: "/api/v1/pitch-tasks"
+
+  rehearsals:
+    label: "对练排练（免费版 5 次/月）"
+    plans:
+      free: 5
+      pro: null
+      elite: null
+      enterprise: null
+    trigger_id: "T2"
+    gated_method: "POST"
+    gated_path: "/api/v1/rehearsals"
+
+  narration_pages:
+    label: "AI 示范讲解（免费版前 3 页）"
+    plans:
+      free: 3
+      pro: null
+      elite: null
+      enterprise: null
+    trigger_id: "T1"
+    gated_method: "POST"
+    gated_path: "/api/v1/narrations/generate"
+
+  knowledge_docs:
+    label: "知识库上传"
+    plans:
+      free: 0          # completely disabled on free
+      pro: 50
+      elite: 500
+      enterprise: null
+    trigger_id: "T6"
+    gated_method: "POST"
+    gated_path: "/api/v1/knowledge/documents"
+
+  evaluator_sessions:
+    label: "评委模拟（免费版不可用）"
+    plans:
+      free: 0
+      pro: null
+      elite: null
+      enterprise: null
+    trigger_id: "T6"
+    gated_method: "POST"
+    gated_path: "/api/v1/evaluators/sessions"
+
+  rubric_scoring:
+    label: "评分表对标（专业版起）"
+    plans:
+      free: 0
+      pro: null
+      elite: null
+      enterprise: null
+    trigger_id: "T3"
+    gated_method: "POST"
+    gated_path: "/api/v1/rubrics"

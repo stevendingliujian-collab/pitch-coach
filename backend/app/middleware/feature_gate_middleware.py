@@ -30,11 +30,13 @@ from app.core.database import AsyncSessionLocal
 from app.core.security import decode_token
 from app.models.user import User
 from app.models.tenant import Tenant
-from app.services.quota_service import check_quota, FEATURE_LABELS
+from app.services.quota_service import check_quota, FEATURE_LABELS, get_gated_routes
 from sqlalchemy import select
 
-# Map (method, path_prefix) → (feature_key, trigger_id)
-GATED_ROUTES: list[tuple[str, str, str, str]] = [
+# Load gated routes from feature registry (YAML-driven)
+# Falls back to hardcoded routes if registry is empty.
+_registry_routes = get_gated_routes()
+GATED_ROUTES: list[tuple[str, str, str, str]] = _registry_routes or [
     ("POST", "/api/v1/pitch-tasks",         "ppt_uploads",     "T2"),
     ("POST", "/api/v1/rehearsals",          "rehearsals",      "T2"),
     ("POST", "/api/v1/narrations/generate", "narration_pages", "T1"),
