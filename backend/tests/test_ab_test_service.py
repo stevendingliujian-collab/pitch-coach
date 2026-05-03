@@ -1,9 +1,45 @@
 """Unit tests for ab_test_service — deterministic bucketing logic."""
 import sys
 import os
+import types
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.services.ab_test_service import _bucket, _pick_variant
+# Stub heavy deps so pure-logic functions can be imported without a full stack
+_STUB_MODS = [
+    "sqlalchemy", "sqlalchemy.orm", "sqlalchemy.ext", "sqlalchemy.ext.asyncio",
+    "pydantic", "pydantic.v1",
+    "app.core.database", "app.models.ab_test",
+    "app.core.security", "app.models.user",
+]
+for _mod in _STUB_MODS:
+    if _mod not in sys.modules:
+        sys.modules[_mod] = types.ModuleType(_mod)
+
+# Populate common sqlalchemy symbols
+for _attr in ("select", "Column", "Integer", "String", "Boolean", "DateTime",
+              "Text", "SmallInteger", "ForeignKey", "Index", "UniqueConstraint",
+              "func", "and_", "or_", "insert", "update", "delete"):
+    for _ns in ("sqlalchemy", "sqlalchemy.orm"):
+        mod = sys.modules[_ns]
+        if not hasattr(mod, _attr):
+            setattr(mod, _attr, lambda *a, **kw: None)
+
+# AsyncSession stub
+_asyncio_mod = sys.modules["sqlalchemy.ext.asyncio"]
+if not hasattr(_asyncio_mod, "AsyncSession"):
+    class _AsyncSession: pass  # type: ignore
+    _asyncio_mod.AsyncSession = _AsyncSession  # type: ignore
+
+# Model stubs
+class _ModelStub:
+    def __init__(self, *a, **kw): pass
+_ab_test_mod = sys.modules["app.models.ab_test"]
+_ab_test_mod.AbTest = _ModelStub  # type: ignore
+_ab_test_mod.AbTestAssignment = _ModelStub  # type: ignore
+_ab_test_mod.AbTestEvent = _ModelStub  # type: ignore
+
+from app.services.ab_test_service import _bucket, _pick_variant  # noqa: E402
 
 
 def test_bucket_deterministic():
