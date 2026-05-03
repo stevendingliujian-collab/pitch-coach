@@ -2,6 +2,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.core.storage import get_presigned_upload_url, upload_bytes, get_presigned_download_url
@@ -100,10 +101,13 @@ async def list_plans_by_task(
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
-        select(PitchPlan).where(
+        select(PitchPlan)
+        .options(selectinload(PitchPlan.pages))
+        .where(
             PitchPlan.pitch_task_id == task_id,
             PitchPlan.tenant_id == current_user.tenant_id,
-        ).order_by(PitchPlan.version.desc())
+        )
+        .order_by(PitchPlan.version.desc())
     )
     return result.scalars().all()
 
@@ -157,7 +161,6 @@ async def regenerate_plan(
 
 
 async def _get_plan_or_404(plan_id: int, tenant_id: int, db: AsyncSession) -> PitchPlan:
-    from sqlalchemy.orm import selectinload
     result = await db.execute(
         select(PitchPlan)
         .options(selectinload(PitchPlan.pages))

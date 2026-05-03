@@ -1,5 +1,7 @@
 import json
+import os
 import re
+import httpx
 from openai import AsyncOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from app.core.config import get_settings
@@ -7,10 +9,28 @@ from app.core.desensitize import DesensitizeContext
 
 settings = get_settings()
 
-_client = AsyncOpenAI(
-    api_key=settings.deepseek_api_key,
-    base_url=settings.deepseek_base_url,
-)
+_client: AsyncOpenAI | None = None
+
+# Dashscope domains that must bypass any system proxy
+_NO_PROXY_HOSTS = {"dashscope.aliyuncs.com", "coding.dashscope.aliyuncs.com"}
+
+
+def _get_client() -> AsyncOpenAI:
+    global _client
+    if _client is None:
+        # Direct transport (no proxy) for dashscope; system proxy for everything else
+        system_proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+        direct = httpx.AsyncHTTPTransport()  # no proxy
+        mounts: dict = {f"https://{h}": direct for h in _NO_PROXY_HOSTS}
+        if system_proxy:
+            mounts["all://"] = httpx.AsyncHTTPTransport(proxy=httpx.Proxy(system_proxy))
+        http_client = httpx.AsyncClient(mounts=mounts, timeout=60)
+        _client = AsyncOpenAI(
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_base_url,
+            http_client=http_client,
+        )
+    return _client
 
 SYSTEM_PROMPT = """你是一位拥有 15 年项目投标经验的述标专家，擅长非标自动化、系统集成和软件开发领域的投标演示。
 
@@ -166,7 +186,7 @@ async def generate_pitch_plan(
     if progress_callback:
         await progress_callback(10, "sending_to_llm")
 
-    response = await _client.chat.completions.create(
+    response = await _get_client().chat.completions.create(
         model=settings.llm_model,
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -174,7 +194,7 @@ async def generate_pitch_plan(
         ],
         max_tokens=settings.llm_max_tokens,
         temperature=settings.llm_temperature,
-        response_format={"type": "json_object"},
+        extra_body={"enable_thinking": False},
     )
 
     if progress_callback:

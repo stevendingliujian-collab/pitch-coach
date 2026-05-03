@@ -1,3 +1,4 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
@@ -23,12 +24,14 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 1440  # 24 hours
 
-    # LLM
-    deepseek_api_key: str = ""
-    deepseek_base_url: str = "https://api.deepseek.com/v1"
-    llm_model: str = "deepseek-chat"
+    # LLM (DashScope / Qwen)
+    llm_api_key: str = ""
+    llm_base_url: str = "https://coding.dashscope.aliyuncs.com/v1"
+    llm_model: str = "qwen3.6-plus"
     llm_max_tokens: int = 8192
     llm_temperature: float = 0.3
+    # Bypass proxy for domestic API endpoints
+    no_proxy: str = "localhost,127.0.0.1,::1,.local,dashscope.aliyuncs.com,coding.dashscope.aliyuncs.com"
 
     # TTS
     fish_audio_api_key: str = ""
@@ -54,4 +57,11 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    s = Settings()
+    # Merge our domains into existing NO_PROXY so domestic APIs bypass the system proxy
+    existing = os.environ.get("NO_PROXY", "") or os.environ.get("no_proxy", "")
+    extra = [d for d in s.no_proxy.split(",") if d not in existing]
+    merged = ",".join(filter(None, [existing] + extra))
+    os.environ["NO_PROXY"] = merged
+    os.environ["no_proxy"] = merged
+    return s

@@ -19,10 +19,16 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Override URL from environment if set
-db_url = os.getenv("DATABASE_URL", "").replace("+asyncpg", "+psycopg2")
+# Override URL from environment if set (keep asyncpg for async migrations)
+db_url = os.getenv("DATABASE_URL", "")
 if db_url:
-    config.set_main_option("sqlalchemy.url", db_url)
+    # Ensure we use asyncpg for the async engine
+    async_url = db_url.replace("+psycopg2", "+asyncpg").replace(
+        "postgresql://", "postgresql+asyncpg://"
+    )
+    if not async_url.startswith("postgresql+asyncpg"):
+        async_url = db_url
+    config.set_main_option("sqlalchemy.url", async_url)
 
 
 def run_migrations_offline() -> None:

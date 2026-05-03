@@ -5,7 +5,7 @@ export const api = axios.create({
   timeout: 30000,
 })
 
-// Attach JWT on every request
+// Attach JWT — reads from localStorage so it works even before Pinia hydrates
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token')
   if (token) config.headers.Authorization = `Bearer ${token}`
@@ -18,7 +18,10 @@ api.interceptors.response.use(
   (err) => {
     if (err.response?.status === 401) {
       localStorage.removeItem('access_token')
-      window.location.href = '/login'
+      // Use Vue Router if available, otherwise hard redirect
+      const router = (window as any).__vue_router__
+      if (router) router.push('/login')
+      else window.location.href = '/login'
     }
     return Promise.reject(err)
   },
