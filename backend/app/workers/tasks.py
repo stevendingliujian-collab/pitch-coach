@@ -266,11 +266,17 @@ async def _score_rehearsal(task: Task, rehearsal_id: int):
 
             rehearsal.total_score = result.total_score
             rehearsal.dimension_scores = {
-                "fluency": result.fluency_score,
-                "rate": result.rate_score,
-                "timing": result.timing_score,
-                "chars_per_min": result.chars_per_min,
-                "total_duration_sec": result.total_duration_sec,
+                "fluency":      result.fluency_score,
+                "rate":         result.rate_score,
+                "timing":       result.timing_score,
+                "originality":  result.originality_score,
+                "compliance":   result.compliance_score,
+                "pauses":       result.pause_score,
+                "chars_per_min":            result.chars_per_min,
+                "total_duration_sec":       result.total_duration_sec,
+                "originality_overlap_ratio": result.originality_overlap_ratio,
+                "compliance_violations":    result.compliance_violations,
+                "long_pause_count":         result.long_pause_count,
             }
             rehearsal.filler_word_count = result.filler_count
             rehearsal.filler_word_detail = result.filler_detail

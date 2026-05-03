@@ -63,10 +63,16 @@ class RehearsalReportResponse(BaseModel):
     fluency_score: float | None = None
     rate_score: float | None = None
     timing_score: float | None = None
+    originality_score: float | None = None   # NEW: originality vs PPT content
+    compliance_score: float | None = None    # NEW: compliance risk detection
+    pause_score: float | None = None         # NEW: long pause detection
     filler_count: int | None = None
     filler_detail: list[FillerWordDetail] = Field(default_factory=list)
     chars_per_min: float | None = None
     total_duration_sec: float | None = None
+    originality_overlap_ratio: float | None = None
+    compliance_violations: list[str] = Field(default_factory=list)
+    long_pause_count: int | None = None
     improvement_tips: list[str] = Field(default_factory=list)
     page_scores: list[PageScore] = Field(default_factory=list)
     page_timings: list[PageTiming] = Field(default_factory=list)

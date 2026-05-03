@@ -1,4 +1,13 @@
-"""Rule-based scoring engine: filler words, speech rate, timing."""
+"""Rule-based scoring engine: 6-dimension expression analysis.
+
+Dimensions:
+  1. fluency_score   — 填充词密度 (filler words per 100 chars)
+  2. rate_score      — 语速适中度 (chars per minute vs ideal range)
+  3. timing_score    — 时间控制 (total duration deviation + core page ratio)
+  4. originality_score — 原创性 (penalise verbatim PPT text recitation)
+  5. compliance_score  — 合规风险词 (detect forbidden/risky phrases)
+  6. fluency_pause_score — 卡顿检测 (long silences > 3s from ASR segments)
+"""
 from __future__ import annotations
 
 import re
@@ -51,17 +60,42 @@ class TimingResult:
 
 
 @dataclass
+class OriginalityResult:
+    overlap_ratio: float   # 0-1: fraction of 4-grams shared with PPT text
+    score: float           # 100 = fully original, 0 = reading PPT verbatim
+
+
+@dataclass
+class ComplianceResult:
+    violations: list[str]  # matched risky phrase patterns
+    score: float           # 100 = no violations
+
+
+@dataclass
+class PauseResult:
+    long_pause_count: int  # silences > 3s
+    score: float           # 100 = no long pauses
+
+
+@dataclass
 class ScoreResult:
     total_score: float
-    fluency_score: float     # filler words
-    rate_score: float        # speech rate
-    timing_score: float      # time allocation
+    fluency_score: float         # filler words
+    rate_score: float            # speech rate
+    timing_score: float          # time allocation
+    originality_score: float     # (NEW) originality vs PPT
+    compliance_score: float      # (NEW) compliance risk words
+    pause_score: float           # (NEW) long pause detection
     filler_count: int
     filler_detail: list[dict]
     chars_per_min: float
     total_duration_sec: float
     improvement_tips: list[str]
     page_scores: list[dict]
+    # Extra details
+    originality_overlap_ratio: float = 0.0
+    compliance_violations: list[str] = field(default_factory=list)
+    long_pause_count: int = 0
 
 
 def score_rehearsal(
@@ -71,14 +105,15 @@ def score_rehearsal(
     target_duration_sec: int = 1200,
 ) -> ScoreResult:
     """
+    6-dimension scoring.
+
     Args:
         transcript_segments: [{text, start, end}, ...]  from ASR
         page_timings: [{page_number, start_sec, end_sec}, ...]
-        plan_pages: [{page_number, importance_level, suggested_duration_sec}, ...]
+        plan_pages: [{page_number, importance_level, suggested_duration_sec, content}, ...]
         target_duration_sec: planned total presentation duration
     """
     full_text = " ".join(seg.get("text", "") for seg in transcript_segments)
-    total_chars = len(re.sub(r"\s+", "", full_text))
 
     # Determine actual total duration from page_timings
     if page_timings:
@@ -92,22 +127,40 @@ def score_rehearsal(
     filler = _score_filler(full_text)
     rate = _score_rate(transcript_segments, page_timings, total_duration_sec)
     timing = _score_timing(page_timings, plan_pages, target_duration_sec, total_duration_sec)
+    originality = _score_originality(full_text, plan_pages)
+    compliance = _score_compliance(full_text)
+    pauses = _score_pauses(transcript_segments)
     page_scores = _compute_page_scores(page_timings, plan_pages, transcript_segments)
 
-    total = round(filler.score * 0.35 + rate.score * 0.30 + timing.score * 0.35, 1)
-    tips = _generate_tips(filler, rate, timing)
+    # Weighted total: original 3 dimensions 75% + 3 new dimensions 25%
+    total = round(
+        filler.score * 0.25
+        + rate.score * 0.20
+        + timing.score * 0.30
+        + originality.score * 0.10
+        + compliance.score * 0.08
+        + pauses.score * 0.07,
+        1,
+    )
+    tips = _generate_tips(filler, rate, timing, originality, compliance, pauses)
 
     return ScoreResult(
         total_score=total,
         fluency_score=round(filler.score, 1),
         rate_score=round(rate.score, 1),
         timing_score=round(timing.score, 1),
+        originality_score=round(originality.score, 1),
+        compliance_score=round(compliance.score, 1),
+        pause_score=round(pauses.score, 1),
         filler_count=filler.count,
         filler_detail=filler.detail,
         chars_per_min=round(rate.chars_per_min, 1),
         total_duration_sec=round(total_duration_sec, 1),
         improvement_tips=tips,
         page_scores=page_scores,
+        originality_overlap_ratio=round(originality.overlap_ratio, 3),
+        compliance_violations=compliance.violations,
+        long_pause_count=pauses.long_pause_count,
     )
 
 
@@ -271,6 +324,92 @@ def _compute_page_scores(
     return result
 
 
+def _extract_ngrams(text: str, n: int = 4) -> set[str]:
+    """Extract character n-grams from text (ignoring spaces)."""
+    t = re.sub(r"\s+", "", text)
+    return {t[i:i+n] for i in range(len(t) - n + 1)}
+
+
+def _score_originality(speech_text: str, plan_pages: list[dict]) -> OriginalityResult:
+    """
+    Measure how much of the speech is verbatim PPT text.
+    High overlap = reading slides, penalised.
+    Uses 4-gram overlap ratio.
+    """
+    ppt_text = " ".join(
+        str(p.get("content", "")) + " " + str(p.get("key_points", "") or "")
+        for p in plan_pages
+    )
+    speech_ngrams = _extract_ngrams(speech_text, 4)
+    ppt_ngrams = _extract_ngrams(ppt_text, 4)
+
+    if not speech_ngrams:
+        return OriginalityResult(overlap_ratio=0.0, score=100.0)
+
+    overlap = len(speech_ngrams & ppt_ngrams)
+    ratio = overlap / len(speech_ngrams)
+
+    # Score: 0% overlap = 100, 30% = 85, 60% = 65, 90%+ = 40
+    if ratio <= 0.20:
+        score = 100.0
+    elif ratio <= 0.40:
+        score = 90.0 - (ratio - 0.20) / 0.20 * 15
+    elif ratio <= 0.70:
+        score = 75.0 - (ratio - 0.40) / 0.30 * 25
+    else:
+        score = max(40.0, 50.0 - (ratio - 0.70) / 0.30 * 10)
+
+    return OriginalityResult(overlap_ratio=round(ratio, 3), score=round(score, 1))
+
+
+# Compliance risk patterns for 述标 context
+_COMPLIANCE_PATTERNS: list[tuple[str, str]] = [
+    (r"保证[一-龥]*第一|一定会赢|百分之百|必[一-龥]*中标", "投标禁语（不当承诺）"),
+    (r"已经跑通|内部消息|关系[一-龥]*打点|找关系", "合规风险（暗示关系营销）"),
+    (r"竞争对手[一-龥]{0,4}烂|竞争对手[一-龥]{0,4}差劲", "竞品诋毁"),
+    (r"价格[一-龥]{0,4}随便|可以[一-龥]{0,4}返点|回扣", "价格合规风险"),
+]
+_COMPLIANCE_RE = [(re.compile(p, re.UNICODE), label) for p, label in _COMPLIANCE_PATTERNS]
+
+
+def _score_compliance(text: str) -> ComplianceResult:
+    """Detect compliance risk phrases. 100 = clean, deduct 15 per violation."""
+    violations: list[str] = []
+    for pattern, label in _COMPLIANCE_RE:
+        if pattern.search(text):
+            violations.append(label)
+    score = max(40.0, 100.0 - len(violations) * 15)
+    return ComplianceResult(violations=violations, score=score)
+
+
+def _score_pauses(segments: list[dict]) -> PauseResult:
+    """
+    Count long silences (> 3 seconds) between ASR segments.
+    More long pauses = lower score.
+    """
+    if len(segments) < 2:
+        return PauseResult(long_pause_count=0, score=100.0)
+
+    sorted_segs = sorted(segments, key=lambda s: s.get("start", 0))
+    long_pauses = 0
+    for i in range(1, len(sorted_segs)):
+        gap = sorted_segs[i].get("start", 0) - sorted_segs[i - 1].get("end", 0)
+        if gap > 3.0:
+            long_pauses += 1
+
+    # Score: 0 pauses = 100, 1 = 90, 3 = 70, 6+ = 50
+    if long_pauses == 0:
+        score = 100.0
+    elif long_pauses <= 2:
+        score = 90.0 - long_pauses * 5
+    elif long_pauses <= 5:
+        score = 80.0 - (long_pauses - 2) * 7
+    else:
+        score = max(50.0, 59.0 - (long_pauses - 5) * 3)
+
+    return PauseResult(long_pause_count=long_pauses, score=round(score, 1))
+
+
 def detect_filler_words(text: str) -> list[str]:
     """
     Public helper: return a flat list of filler word occurrences found in text.
@@ -279,8 +418,20 @@ def detect_filler_words(text: str) -> list[str]:
     return [m.group(0) for m in _FILLER_RE.finditer(text)]
 
 
-def _generate_tips(filler: FillerResult, rate: RateResult, timing: TimingResult) -> list[str]:
+def _generate_tips(
+    filler: FillerResult,
+    rate: RateResult,
+    timing: TimingResult,
+    originality: OriginalityResult | None = None,
+    compliance: ComplianceResult | None = None,
+    pauses: PauseResult | None = None,
+) -> list[str]:
     tips: list[str] = []
+
+    # Compliance violations (highest priority)
+    if compliance and compliance.violations:
+        for v in compliance.violations[:2]:
+            tips.append(f"⚠️ 合规风险：检测到「{v}」，请调整措辞，避免触犯述标规范。")
 
     if filler.count > 15:
         worst = sorted(filler.detail, key=lambda x: x["count"], reverse=True)[:2]
@@ -302,7 +453,13 @@ def _generate_tips(filler: FillerResult, rate: RateResult, timing: TimingResult)
     if timing.core_page_ratio < 0.55:
         tips.append(f"核心页面时间占比仅{timing.core_page_ratio*100:.0f}%，低于建议的60%，注意重点内容的时间分配。")
 
+    if originality and originality.overlap_ratio > 0.50:
+        tips.append(f"原创性偏低（与PPT内容重合度{originality.overlap_ratio*100:.0f}%），建议用自己的语言转化讲解要点，避免照本宣科。")
+
+    if pauses and pauses.long_pause_count > 2:
+        tips.append(f"卡顿较多（{pauses.long_pause_count}处超过3秒的停顿），建议提前准备过渡语，减少语气中断。")
+
     if not tips:
         tips.append("整体表现良好！继续保持稳定的语速和时间控制。")
 
-    return tips[:3]
+    return tips[:4]  # allow up to 4 tips with the new dimensions
