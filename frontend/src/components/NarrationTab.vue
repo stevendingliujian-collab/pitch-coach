@@ -16,7 +16,7 @@
           style="width: 160px; margin: 0 16px" size="small" />
         <span class="speed-val">{{ speed }}x</span>
 
-        <el-button type="primary" size="small" :loading="generating" :disabled="generating"
+        <el-button type="primary" size="small" :loading="isActivelyGenerating" :disabled="isActivelyGenerating"
           @click="handleGenerate">
           {{ narration ? '重新生成示范' : '生成 AI 示范讲解' }}
         </el-button>
@@ -108,6 +108,7 @@ import { VideoPlay } from '@element-plus/icons-vue'
 import type { PitchPlan, PlanPage } from '@/api/pitchPlan'
 import { narrationApi, type DemoNarration, type VoicePreset } from '@/api/narration'
 import { useAuthStore } from '@/stores/auth'
+import { useConversion } from '@/composables/useConversion'
 
 const props = defineProps<{
   plan: PitchPlan | null
@@ -115,6 +116,7 @@ const props = defineProps<{
 }>()
 
 const auth = useAuthStore()
+const { checkTrigger, trackEvent } = useConversion()
 
 const voices = ref<VoicePreset[]>([])
 const loadingVoices = ref(false)
@@ -126,6 +128,12 @@ const speedMarks = { 0.75: '0.75x', 1.0: '1x', 1.5: '1.5x' }
 const narration = ref<DemoNarration | null>(null)
 const generating = ref(false)
 const genPct = ref(0)
+
+// True only when a task is actively processing (1=脚本生成 2=合成 3=合并)
+// status=0 means queued/pending — task may not have started yet, allow retry
+const isActivelyGenerating = computed(() =>
+  generating.value && narration.value != null && [1, 2, 3].includes(narration.value.status)
+)
 
 const currentPage = ref(1)
 const fullAudioEl = ref<HTMLAudioElement | null>(null)
@@ -162,7 +170,12 @@ function formatSec(sec: number) {
 }
 
 function jumpToPage(pageNum: number) {
+  const previousPage = currentPage.value
   currentPage.value = pageNum
+  // T1: trigger upgrade when free user finishes page 3 and moves to page 4+
+  if (previousPage === 3 && pageNum >= 4) {
+    checkTrigger('T1', { page: pageNum })
+  }
   // Seek full audio to start of this page
   if (fullAudioEl.value && narration.value?.page_audios) {
     const PAUSE = 0.8
@@ -236,7 +249,7 @@ function connectWs(narrationId: number) {
   if (!tenantId) return
   ws?.close()
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-  ws = new WebSocket(`${protocol}://${location.host.replace(':5173', ':8000')}/ws/${tenantId}`)
+  ws = new WebSocket(`${protocol}://${location.host}/ws/${tenantId}`)
 
   ws.onmessage = async (e) => {
     const evt = JSON.parse(e.data)
@@ -280,7 +293,8 @@ onMounted(async () => {
     loadingVoices.value = false
   }
   await refreshNarration()
-  if (narration.value && [0, 1, 2, 3].includes(narration.value.status)) {
+  // Only connect WS and show spinner when actively processing (not just queued)
+  if (narration.value && [1, 2, 3].includes(narration.value.status)) {
     generating.value = true
     connectWs(narration.value.id)
   }

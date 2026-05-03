@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useUpgradeBanner } from '@/composables/useUpgradeBanner'
 
 export const api = axios.create({
   baseURL: '/api/v1',
@@ -12,16 +13,27 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Redirect to login on 401
+// Redirect to login on 401; show upgrade banner on 402
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const status = err.response?.status
+    if (status === 401) {
       localStorage.removeItem('access_token')
-      // Use Vue Router if available, otherwise hard redirect
       const router = (window as any).__vue_router__
       if (router) router.push('/login')
       else window.location.href = '/login'
+    } else if (status === 402) {
+      const data = err.response?.data ?? {}
+      const { show } = useUpgradeBanner()
+      show({
+        feature:    data.feature    ?? 'unknown',
+        used:       data.used       ?? 0,
+        limit:      data.limit      ?? 0,
+        label:      data.label,
+        message:    data.message,
+        trigger_id: data.trigger_id,
+      })
     }
     return Promise.reject(err)
   },

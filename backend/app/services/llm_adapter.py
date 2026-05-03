@@ -98,6 +98,7 @@ def _build_user_prompt(
     bid_requirements: str,
     competitor_info: list,
     pages: list[dict],  # [{page_number, title, content, speaker_notes}]
+    knowledge_context: list[dict] | None = None,  # [{content, heading, rrf_score, doc_type}]
 ) -> str:
     lines = [
         "## 项目信息",
@@ -110,6 +111,21 @@ def _build_user_prompt(
         bid_requirements or "（未提供）",
         "",
     ]
+
+    # Inject top knowledge snippets (capped at 5 to limit prompt size)
+    if knowledge_context:
+        lines += ["## 知识库参考资料（来自历史标书/案例/产品资料）"]
+        lines.append("以下内容摘自企业知识库，请在生成讲解方案时合理引用相关经验和话术：")
+        for i, hit in enumerate(knowledge_context[:5], 1):
+            heading = hit.get("heading") or ""
+            heading_str = f"【{heading}】" if heading else ""
+            doc_type = hit.get("doc_type") or ""
+            type_str = f"（{doc_type}）" if doc_type else ""
+            lines.append(f"\n### 参考片段 {i}{type_str}{heading_str}")
+            # Cap each snippet at 300 chars to keep prompt size reasonable
+            lines.append(hit.get("content", "")[:300])
+        lines.append("")
+
     if competitor_info:
         lines += ["## 竞品信息"]
         for c in competitor_info:
@@ -160,6 +176,7 @@ async def generate_pitch_plan(
     competitor_info: list,
     pages: list[dict],
     person_names: list[str] | None = None,
+    knowledge_context: list[dict] | None = None,
     progress_callback=None,
 ) -> dict:
     """
@@ -192,6 +209,7 @@ async def generate_pitch_plan(
         bid_requirements=_d(bid_requirements or ""),
         competitor_info=competitor_info,
         pages=desensitized_pages,
+        knowledge_context=knowledge_context,
     )
 
     if progress_callback:

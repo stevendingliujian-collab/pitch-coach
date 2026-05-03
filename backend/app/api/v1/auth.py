@@ -6,6 +6,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.models.tenant import Tenant
 from app.models.user import User
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserProfile
+from app.services.conversion_service import track_event
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -33,6 +34,11 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     await db.refresh(user)
 
     token = create_access_token({"sub": str(user.id), "tenant_id": tenant.id, "role": user.role})
+
+    # Track registration event (best-effort)
+    await track_event("user_registered", user, db,
+                      properties={"company_name": body.company_name})
+
     return TokenResponse(
         access_token=token,
         user_id=user.id,

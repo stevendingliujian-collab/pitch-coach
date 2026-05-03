@@ -19,6 +19,13 @@
           <el-tab-pane label="排练记录" name="rehearsal">
             <RehearsalTab :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
           </el-tab-pane>
+          <el-tab-pane label="跟读/背诵" name="training">
+            <TrainingTab
+              :task-id="taskId"
+              :plan-id="currentPlan?.id ?? null"
+              :pages="currentPlan?.pages ?? []"
+            />
+          </el-tab-pane>
           <el-tab-pane label="审核认证" name="review">
             <ReviewTab :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
           </el-tab-pane>
@@ -36,6 +43,7 @@ import { pitchPlanApi, type PitchPlan } from '@/api/pitchPlan'
 import PlanTab from '@/components/PlanTab.vue'
 import NarrationTab from '@/components/NarrationTab.vue'
 import RehearsalTab from '@/components/RehearsalTab.vue'
+import TrainingTab from '@/components/TrainingTab.vue'
 import ReviewTab from '@/components/ReviewTab.vue'
 
 const route = useRoute()

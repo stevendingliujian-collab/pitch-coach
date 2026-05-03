@@ -271,6 +271,14 @@ def _compute_page_scores(
     return result
 
 
+def detect_filler_words(text: str) -> list[str]:
+    """
+    Public helper: return a flat list of filler word occurrences found in text.
+    Used by daily_practice lightweight scoring.
+    """
+    return [m.group(0) for m in _FILLER_RE.finditer(text)]
+
+
 def _generate_tips(filler: FillerResult, rate: RateResult, timing: TimingResult) -> list[str]:
     tips: list[str] = []
 

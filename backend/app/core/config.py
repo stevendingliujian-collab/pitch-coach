@@ -33,10 +33,23 @@ class Settings(BaseSettings):
     # Bypass proxy for domestic API endpoints
     no_proxy: str = "localhost,127.0.0.1,::1,.local,dashscope.aliyuncs.com,coding.dashscope.aliyuncs.com"
 
-    # TTS
+    # Knowledge base
+    qdrant_url: str = "http://localhost:6333"
+    embedding_model: str = "qwen3-embedding-8b"
+    embedding_base_url: str = "https://aihubmix.com/v1"
+    embedding_api_key: str = ""   # falls back to llm_api_key if empty
+    embedding_dim: int = 4096     # qwen3-embedding-8b native dimension
+
+    # TTS — provider: "fish_audio" | "xfyun" | "stub"
+    tts_provider: str = "fish_audio"
+    # Fish Audio
     fish_audio_api_key: str = ""
     fish_audio_base_url: str = "https://api.fish.audio/v1"
-    tts_provider: str = "fish_audio"
+    # 科大讯飞在线语音合成 WebAPI
+    # 控制台: https://console.xfyun.cn/app/myapp → 语音合成（流式版）
+    xfyun_app_id: str = ""
+    xfyun_api_key: str = ""
+    xfyun_api_secret: str = ""
 
     # ASR
     asr_provider: str = "paraformer"

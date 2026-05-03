@@ -16,6 +16,10 @@ const router = createRouter({
     { path: '/rehearse', name: 'rehearsal', component: () => import('@/views/RehearsalView.vue') },
     // ReportView receives rehearsal id as route param
     { path: '/report/:id', name: 'report', component: () => import('@/views/ReportView.vue') },
+    // P1 Knowledge base
+    { path: '/knowledge', name: 'knowledge', component: () => import('@/views/KnowledgeView.vue') },
+    // P1 F9 Daily micro-practice (free, unlimited)
+    { path: '/daily-practice', name: 'dailyPractice', component: () => import('@/views/DailyPracticeView.vue') },
 
     // Embedded mode (CRM iframe)
     { path: '/embed', name: 'embed', component: () => import('@/views/EmbedView.vue'), meta: { public: true } },

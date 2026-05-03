@@ -89,8 +89,10 @@ import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { pitchTaskApi, type PitchTask } from '@/api/pitchTask'
 import dayjs from 'dayjs'
+import { useConversion } from '@/composables/useConversion'
 
 const router = useRouter()
+const { checkTrigger, trackEvent } = useConversion()
 const tasks = ref<PitchTask[]>([])
 const loading = ref(false)
 const showCreate = ref(false)
@@ -122,6 +124,15 @@ async function handleCreate() {
     const res = await pitchTaskApi.create(payload)
     tasks.value.unshift(res.data)
     showCreate.value = false
+
+    // T9: if bid date is within 7 days, trigger urgency upgrade prompt
+    if (payload.bid_date) {
+      const daysUntilBid = dayjs(payload.bid_date).diff(dayjs(), 'day')
+      if (daysUntilBid >= 0 && daysUntilBid <= 7) {
+        checkTrigger('T9', { days_left: daysUntilBid, task_id: res.data.id })
+      }
+    }
+
     router.push(`/projects/${res.data.id}`)
   } catch (err: any) {
     ElMessage.error(err.response?.data?.detail || '创建失败')

@@ -6,6 +6,8 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.pitch_task import PitchTask
 from app.schemas.pitch_task import PitchTaskCreate, PitchTaskUpdate, PitchTaskResponse
+from app.services.quota_service import increment_usage
+from app.services.conversion_service import track_event
 
 router = APIRouter(prefix="/pitch-tasks", tags=["pitch-tasks"])
 
@@ -37,6 +39,11 @@ async def create_task(
     db.add(task)
     await db.commit()
     await db.refresh(task)
+    # Track usage (gate already checked by FeatureGateMiddleware)
+    await increment_usage("ppt_uploads", current_user, db, meta={"task_id": task.id})
+    await track_event("ppt_uploaded", current_user, db,
+                      properties={"task_id": task.id, "task_name": task.name})
+    await db.commit()
     return task
 
 

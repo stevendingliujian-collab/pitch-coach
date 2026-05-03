@@ -55,9 +55,11 @@
           </div>
         </el-collapse-item>
         <el-collapse-item v-if="plan.predicted_questions?.length" name="questions" title="评委问题预判">
-          <div v-for="(q, i) in plan.predicted_questions" :key="i" class="question-item">
-            <p class="q-text">Q{{ i+1 }}：{{ q.question }}</p>
-            <p class="a-text">建议方向：{{ q.answer_direction }}</p>
+          <div class="questions-list">
+            <div v-for="(q, i) in plan.predicted_questions" :key="i" class="question-item">
+              <p class="q-text">Q{{ i+1 }}：{{ q.question }}</p>
+              <p class="a-text">建议答题方向：{{ q.answer_direction }}</p>
+            </div>
           </div>
         </el-collapse-item>
       </el-collapse>
@@ -316,10 +318,51 @@ function importanceTagType(level: number) {
 .plan-actions { margin-left: auto; display: flex; gap: 8px; }
 
 .strategy-card { margin-bottom: 16px; }
-.strategy-content p { margin-bottom: 8px; font-size: 14px; color: #606266; }
-.question-item { padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
-.q-text { font-weight: 500; color: #303133; }
-.a-text { color: #606266; font-size: 13px; margin-top: 4px; }
+.strategy-card :deep(.el-collapse-item__header) {
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  height: 48px;
+}
+.strategy-card :deep(.el-collapse-item__content) {
+  padding-bottom: 12px;
+}
+
+.strategy-content {
+  padding: 4px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.strategy-content p {
+  margin: 0;
+  font-size: 14px;
+  color: #606266;
+  line-height: 1.7;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+}
+.strategy-content p strong {
+  color: #303133;
+  margin-right: 4px;
+}
+
+.questions-list {
+  padding: 4px 16px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.question-item {
+  padding: 12px 14px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border-left: 3px solid #409eff;
+}
+.q-text { font-weight: 600; color: #303133; font-size: 14px; margin-bottom: 6px; }
+.a-text { color: #606266; font-size: 13px; line-height: 1.6; margin: 0; }
 
 .split-layout { display: flex; gap: 0; border: 1px solid #e4e7ed; border-radius: 8px; overflow: hidden; }
 

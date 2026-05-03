@@ -42,7 +42,7 @@ async def _generate_plan(task: Task, plan_id: int):
     from app.services.ppt_parser import parse_pptx
     from app.services.llm_adapter import generate_pitch_plan
     from app.core.storage import download_bytes, upload_bytes
-    from app.core.ws_manager import ws_manager
+    from app.core.ws_manager import publish_progress
 
     async with _make_session()() as db:
         result = await db.execute(select(PitchPlan).where(PitchPlan.id == plan_id))
@@ -54,7 +54,8 @@ async def _generate_plan(task: Task, plan_id: int):
         pitch_task = task_result.scalar_one_or_none()
 
         async def progress(pct: int, stage: str):
-            await ws_manager.send_progress(
+            await publish_progress(
+                redis_url=settings.redis_url,
                 tenant_id=plan.tenant_id,
                 entity_type="plan",
                 entity_id=plan_id,
@@ -90,6 +91,28 @@ async def _generate_plan(task: Task, plan_id: int):
                 for p in parsed.pages
             ]
 
+            # Search knowledge base for relevant context (best-effort; skip on failure)
+            knowledge_context: list[dict] | None = None
+            try:
+                from app.services.knowledge_service import hybrid_search
+                query_terms = " ".join(filter(None, [
+                    plan.customer_industry,
+                    pitch_task.name if pitch_task else plan.ppt_file_name,
+                    plan.bid_requirements[:100] if plan.bid_requirements else None,
+                ]))
+                if query_terms.strip():
+                    hits = await hybrid_search(
+                        query=query_terms,
+                        tenant_id=plan.tenant_id,
+                        db=db,
+                        top_n=5,
+                    )
+                    if hits:
+                        knowledge_context = hits
+            except Exception as kb_err:
+                import logging
+                logging.getLogger(__name__).warning(f"Knowledge search skipped: {kb_err}")
+
             llm_result = await generate_pitch_plan(
                 project_name=pitch_task.name if pitch_task else plan.ppt_file_name,
                 customer_name=plan.customer_name or "",
@@ -99,6 +122,7 @@ async def _generate_plan(task: Task, plan_id: int):
                 bid_requirements=plan.bid_requirements or "",
                 competitor_info=plan.competitor_info or [],
                 pages=raw_pages,
+                knowledge_context=knowledge_context,
                 progress_callback=progress,
             )
 
@@ -166,7 +190,7 @@ async def _score_rehearsal(task: Task, rehearsal_id: int):
     from app.services.asr_adapter import transcribe
     from app.services.scoring_engine import score_rehearsal
     from app.core.storage import download_bytes
-    from app.core.ws_manager import ws_manager
+    from app.core.ws_manager import publish_progress
 
     async with _make_session()() as db:
         rehearsal = await db.get(Rehearsal, rehearsal_id)
@@ -174,7 +198,8 @@ async def _score_rehearsal(task: Task, rehearsal_id: int):
             return
 
         async def progress(pct: int, stage: str):
-            await ws_manager.send_progress(
+            await publish_progress(
+                redis_url=settings.redis_url,
                 tenant_id=rehearsal.tenant_id,
                 entity_type="rehearsal",
                 entity_id=rehearsal_id,
@@ -268,7 +293,7 @@ async def _generate_narration(task: Task, narration_id: int):
     from app.services.llm_adapter import generate_page_scripts
     from app.services.tts_adapter import text_to_speech
     from app.core.storage import upload_bytes, download_bytes
-    from app.core.ws_manager import ws_manager
+    from app.core.ws_manager import publish_progress
     import asyncio
     import tempfile
     import os
@@ -280,7 +305,8 @@ async def _generate_narration(task: Task, narration_id: int):
             return
 
         async def progress(pct: int, stage: str):
-            await ws_manager.send_progress(
+            await publish_progress(
+                redis_url=settings.redis_url,
                 tenant_id=narration.tenant_id,
                 entity_type="narration",
                 entity_id=narration_id,
@@ -479,3 +505,101 @@ async def _merge_audio(
         total_dur = sum(pa.get("duration_sec", 60) for pa in page_audios)
         total_dur += int(PAGE_PAUSE_MS / 1000) * (len(page_audios) - 1)
         return total_dur
+
+
+# ---------------------------------------------------------------------------
+# Knowledge base ingestion task (P1 知识库)
+# ---------------------------------------------------------------------------
+
+@celery_app.task(bind=True, base=DatabaseTask, name="app.workers.tasks.ingest_document_task",
+                 max_retries=1, default_retry_delay=30)
+def ingest_document_task(self, doc_id: int):
+    asyncio.run(_ingest_document(self, doc_id))
+
+
+async def _ingest_document(task: Task, doc_id: int):
+    from app.services.knowledge_service import ingest_document
+
+    async with _make_session()() as db:
+        try:
+            await ingest_document(doc_id, db)
+        except Exception as exc:
+            raise task.retry(exc=exc)
+
+
+# ---------------------------------------------------------------------------
+# Monthly usage reset (Celery Beat — 1st of every month at 00:00 CST)
+# ---------------------------------------------------------------------------
+
+@celery_app.task(name="app.workers.tasks.reset_monthly_usage_task")
+def reset_monthly_usage_task():
+    asyncio.run(_reset_monthly_usage())
+
+
+async def _reset_monthly_usage():
+    """
+    Reset usage_meter counters for the PREVIOUS month.
+    The upsert-based quota_service accumulates counts in the current month row.
+    We don't delete old rows (they serve as audit history); we just log the reset.
+    No DB writes needed: quota_service uses (user_id, feature, year_month) as the PK
+    so the new month automatically starts at 0 when the first event is recorded.
+    This task simply logs the rollover and can be extended with notification logic.
+    """
+    import logging
+    from datetime import date
+
+    logger = logging.getLogger(__name__)
+    today = date.today()
+    logger.info(
+        "Monthly usage rollover: %s-%02d → %s-%02d",
+        today.year if today.month > 1 else today.year - 1,
+        today.month - 1 if today.month > 1 else 12,
+        today.year,
+        today.month,
+    )
+    # Optional: send summary email / Slack notification (P2)
+
+
+# ---------------------------------------------------------------------------
+# Bid deadline 48h warning (Celery Beat — every hour)
+# ---------------------------------------------------------------------------
+
+@celery_app.task(name="app.workers.tasks.bid_deadline_warning_task")
+def bid_deadline_warning_task():
+    asyncio.run(_bid_deadline_warning())
+
+
+async def _bid_deadline_warning():
+    """
+    Scan pitch_task rows where bid_date is between 24h and 48h from now.
+    Log the upcoming deadlines (webhook / notification in P2).
+    """
+    import logging
+    from datetime import datetime, timedelta
+
+    logger = logging.getLogger(__name__)
+
+    async with _make_session()() as db:
+        from sqlalchemy import select, text
+        now = datetime.utcnow()
+        window_start = now + timedelta(hours=24)
+        window_end = now + timedelta(hours=48)
+
+        result = await db.execute(
+            text(
+                """
+                SELECT id, name, tenant_id, bid_date
+                FROM pitch_task
+                WHERE bid_date BETWEEN :start AND :end
+                  AND status != 3
+                """
+            ),
+            {"start": window_start, "end": window_end},
+        )
+        rows = result.fetchall()
+        for row in rows:
+            logger.info(
+                "48h bid warning — task_id=%s name=%s bid_date=%s tenant_id=%s",
+                row.id, row.name, row.bid_date, row.tenant_id,
+            )
+        # TODO P2: push notification via 企微/飞书/钉钉 webhook

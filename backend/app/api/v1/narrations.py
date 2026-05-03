@@ -99,7 +99,7 @@ async def generate_narration(
     if plan.status not in (1, 2):  # must be generated or manually edited
         raise HTTPException(status_code=400, detail="Plan not ready (generate plan first)")
 
-    # Cancel any in-flight narrations for this plan
+    # Check for existing narrations for this plan
     existing = await db.execute(
         select(DemoNarration)
         .where(DemoNarration.plan_id == plan_id)
@@ -107,12 +107,26 @@ async def generate_narration(
         .limit(1)
     )
     prev = existing.scalar_one_or_none()
-    if prev and prev.status in (0, 1, 2, 3):
+
+    from app.workers.tasks import generate_narration_task
+
+    if prev and prev.status in (1, 2, 3):
+        # Actively running — reject
         raise HTTPException(
             status_code=409,
             detail="Narration generation already in progress",
         )
 
+    if prev and prev.status == 0:
+        # Stuck in pending (task never picked up or worker was down) — re-dispatch
+        prev.voice_id = req.voice_id
+        prev.voice_name = req.voice_name
+        prev.speed = req.speed
+        await db.commit()
+        generate_narration_task.delay(prev.id)
+        return {"narration_id": prev.id, "status": "accepted"}
+
+    # Create fresh record (first time, or previous was done/error)
     narration = DemoNarration(
         tenant_id=current_user.tenant_id,
         plan_id=plan_id,
@@ -126,7 +140,6 @@ async def generate_narration(
     await db.commit()
     await db.refresh(narration)
 
-    from app.workers.tasks import generate_narration_task
     generate_narration_task.delay(narration.id)
 
     return {"narration_id": narration.id, "status": "accepted"}

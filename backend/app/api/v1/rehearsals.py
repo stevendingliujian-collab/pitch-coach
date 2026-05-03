@@ -16,6 +16,8 @@ from app.schemas.rehearsal import (
     PageTiming, FillerWordDetail, PageScore,
 )
 from app.workers.tasks import score_rehearsal_task
+from app.services.quota_service import increment_usage
+from app.services.conversion_service import track_event
 
 router = APIRouter(prefix="/rehearsals", tags=["rehearsals"])
 
@@ -49,6 +51,12 @@ async def start_rehearsal(
     db.add(rehearsal)
     await db.commit()
     await db.refresh(rehearsal)
+
+    # Track usage (gate already checked by FeatureGateMiddleware)
+    await increment_usage("rehearsals", current_user, db, meta={"rehearsal_id": rehearsal.id})
+    await track_event("rehearsal_started", current_user, db,
+                      properties={"rehearsal_id": rehearsal.id, "pitch_task_id": body.pitch_task_id})
+    await db.commit()
 
     return StartRehearsalResponse(
         rehearsal_id=rehearsal.id,

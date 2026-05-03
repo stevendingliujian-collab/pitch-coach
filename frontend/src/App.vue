@@ -7,15 +7,26 @@
         <router-view />
       </div>
     </div>
+    <!-- Global overlays -->
+    <OnboardingGuide v-if="isLoggedIn" />
+    <TrialBanner v-if="isLoggedIn" />
+    <UpgradeBanner />
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import AppNavbar from '@/components/AppNavbar.vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import OnboardingGuide from '@/components/OnboardingGuide.vue'
+import TrialBanner from '@/components/TrialBanner.vue'
+import UpgradeBanner from '@/components/UpgradeBanner.vue'
 import { useAppMode } from '@/composables/useAppMode'
+import { useAuthStore } from '@/stores/auth'
 
 const { showNavbar, showSidebar, containerClass } = useAppMode()
+const auth = useAuthStore()
+const isLoggedIn = computed(() => auth.isLoggedIn)
 </script>
 
 <style>

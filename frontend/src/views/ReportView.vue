@@ -145,10 +145,12 @@ import { ref, computed, onMounted, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, WarningFilled, SuccessFilled } from '@element-plus/icons-vue'
 import { rehearsalApi, type RehearsalReport } from '@/api/rehearsal'
+import { useConversion } from '@/composables/useConversion'
 
 const route = useRoute()
 const router = useRouter()
 const rehearsalId = Number(route.params.id)
+const { checkTrigger, trackEvent } = useConversion()
 
 const loading = ref(true)
 const report = ref<RehearsalReport | null>(null)
@@ -157,6 +159,21 @@ onMounted(async () => {
   try {
     const res = await rehearsalApi.getReport(rehearsalId)
     report.value = res.data
+
+    // Analytics: rehearsal_completed event
+    trackEvent('rehearsal_completed', {
+      rehearsal_id: rehearsalId,
+      total_score: res.data.total_score,
+    })
+
+    // T2: check if user has hit the monthly rehearsal limit (shown after 5th rehearsal)
+    // The backend's FeatureGateMiddleware fires 402 on quota exceeded;
+    // T2 is additionally triggered once on the 5th completion to encourage upgrade.
+    checkTrigger('T2', { rehearsal_id: rehearsalId })
+
+    // T5: after 3 rehearsals, nudge user to see progress curve (premium feature)
+    checkTrigger('T5', { rehearsal_id: rehearsalId, score: res.data.total_score })
+
   } catch { /* 404 or not scored yet */ } finally {
     loading.value = false
   }

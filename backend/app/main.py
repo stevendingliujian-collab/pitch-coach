@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -15,7 +16,21 @@ async def lifespan(app: FastAPI):
         get_minio_client()
     except Exception:
         pass
+
+    # Start Redis → WebSocket bridge (forwards Celery progress events to clients)
+    subscriber_task = asyncio.create_task(
+        ws_manager.subscribe_and_forward(settings.redis_url),
+        name="ws_redis_bridge",
+    )
+
     yield
+
+    # Graceful shutdown
+    subscriber_task.cancel()
+    try:
+        await subscriber_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(
@@ -33,8 +48,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Feature gate: must be added AFTER CORS (middleware stack is LIFO)
+from app.middleware.feature_gate_middleware import FeatureGateMiddleware  # noqa: E402
+app.add_middleware(FeatureGateMiddleware)
+
 # Register API routers
-from app.api.v1 import auth, pitch_tasks, pitch_plans, rehearsals, narrations, reviews  # noqa: E402
+from app.api.v1 import auth, pitch_tasks, pitch_plans, rehearsals, narrations, reviews, knowledge, training, daily_practice, conversion  # noqa: E402
 
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(pitch_tasks.router, prefix="/api/v1")
@@ -42,6 +61,10 @@ app.include_router(pitch_plans.router, prefix="/api/v1")
 app.include_router(rehearsals.router, prefix="/api/v1")
 app.include_router(narrations.router, prefix="/api/v1")
 app.include_router(reviews.router, prefix="/api/v1")
+app.include_router(knowledge.router, prefix="/api/v1")
+app.include_router(training.router, prefix="/api/v1")
+app.include_router(daily_practice.router, prefix="/api/v1")
+app.include_router(conversion.router, prefix="/api/v1")
 
 
 @app.get("/health")
