@@ -50,7 +50,8 @@
       <TrainingTab   v-if="activeTab === 'training'"  :task-id="taskId" :plan-id="currentPlan?.id ?? null" :pages="currentPlan?.pages ?? []" />
       <ReviewTab     v-if="activeTab === 'review'"    :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
       <RubricTab     v-if="activeTab === 'rubric'"    :task-id="taskId" :plan-id="currentPlan?.id ?? null" />
-      <ReadinessTab  v-if="activeTab === 'readiness'" :task-id="taskId" :task="task" @switch-tab="activeTab = $event" @task-updated="task = $event" />
+      <ReadinessTab    v-if="activeTab === 'readiness'"  :task-id="taskId" :task="task" @switch-tab="activeTab = $event" @task-updated="task = $event" />
+      <TeamPracticeTab v-if="activeTab === 'team'"       :task-id="taskId" />
     </div>
   </div>
 </template>
@@ -61,13 +62,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { pitchTaskApi, type PitchTask } from '@/api/pitchTask'
 import { pitchPlanApi, type PitchPlan } from '@/api/pitchPlan'
-import PlanTab      from '@/components/PlanTab.vue'
-import NarrationTab from '@/components/NarrationTab.vue'
-import RehearsalTab from '@/components/RehearsalTab.vue'
-import TrainingTab  from '@/components/TrainingTab.vue'
-import ReviewTab    from '@/components/ReviewTab.vue'
-import RubricTab    from '@/components/RubricTab.vue'
-import ReadinessTab from '@/components/ReadinessTab.vue'
+import PlanTab         from '@/components/PlanTab.vue'
+import NarrationTab    from '@/components/NarrationTab.vue'
+import RehearsalTab    from '@/components/RehearsalTab.vue'
+import TrainingTab     from '@/components/TrainingTab.vue'
+import ReviewTab       from '@/components/ReviewTab.vue'
+import RubricTab       from '@/components/RubricTab.vue'
+import ReadinessTab    from '@/components/ReadinessTab.vue'
+import TeamPracticeTab from '@/components/TeamPracticeTab.vue'
 
 const route   = useRoute()
 const router  = useRouter()
@@ -112,6 +114,11 @@ const tabs = [
     key: 'readiness',
     label: '就绪清单',
     icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="5.5"/><polyline points="4 7 6 9.5 10.5 4.5"/></svg>`,
+  },
+  {
+    key: 'team',
+    label: '组队排练',
+    icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="5" cy="4.5" r="2"/><circle cx="9" cy="4.5" r="2"/><path d="M1 13c0-2.2 1.8-4 4-4"/><path d="M9 9c2.2 0 4 1.8 4 4"/></svg>`,
   },
 ]
 
