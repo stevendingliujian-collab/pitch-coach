@@ -21,8 +21,17 @@ logger = logging.getLogger(__name__)
 TranscriptSegments = list[dict[str, Any]]
 
 
+class AsrError(RuntimeError):
+    """Raised when transcription fails. Callers must surface this to the user
+    instead of scoring on placeholder text."""
+
+
 async def transcribe(audio_bytes: bytes, language: str = "zh") -> TranscriptSegments:
-    """Transcribe audio bytes. Provider chosen from settings / ASR_PROVIDER env var."""
+    """Transcribe audio bytes. Provider chosen from settings / ASR_PROVIDER env var.
+
+    Raises AsrError when the configured provider is misconfigured or fails.
+    Only ASR_PROVIDER=stub (an explicit dev/test choice) returns placeholder text.
+    """
     from app.core.config import get_settings
     settings = get_settings()
 
@@ -32,9 +41,13 @@ async def transcribe(audio_bytes: bytes, language: str = "zh") -> TranscriptSegm
         return await _transcribe_paraformer(audio_bytes, language)
     elif provider == "whisper":
         return await _transcribe_whisper(audio_bytes, language)
-    else:
-        logger.warning("ASR_PROVIDER=%s — using stub transcription", provider)
+    elif provider == "stub":
+        logger.warning("ASR_PROVIDER=stub — returning placeholder transcription")
         return _stub_transcribe(audio_bytes)
+    else:
+        raise AsrError(
+            f"未知的 ASR_PROVIDER '{provider}'（可选: paraformer / whisper / stub）"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -58,8 +71,7 @@ async def _transcribe_paraformer(audio_bytes: bytes, language: str) -> Transcrip
     settings = get_settings()
 
     if not settings.llm_api_key:
-        logger.warning("llm_api_key not set — falling back to stub ASR")
-        return _stub_transcribe(audio_bytes)
+        raise AsrError("ASR 未配置：LLM_API_KEY 为空，无法调用 Paraformer 转录服务")
 
     # Detect audio format from magic bytes
     suffix = _detect_suffix(audio_bytes)
@@ -93,14 +105,21 @@ async def _transcribe_paraformer(audio_bytes: bytes, language: str) -> Transcrip
                 resp.raise_for_status()
                 result = resp.json()
 
-        return _parse_verbose_json(result)
+        segments = _parse_verbose_json(result)
+        if not segments:
+            raise AsrError("Paraformer 转录结果为空（可能是无声音频或格式不受支持）")
+        return segments
 
+    except AsrError:
+        raise
     except httpx.HTTPStatusError as e:
         logger.error(f"Paraformer API error {e.response.status_code}: {e.response.text[:300]}")
-        return _stub_transcribe(audio_bytes)
+        raise AsrError(
+            f"Paraformer 转录失败（HTTP {e.response.status_code}），请稍后重试"
+        ) from e
     except Exception as e:
         logger.error(f"Paraformer transcription failed: {e}")
-        return _stub_transcribe(audio_bytes)
+        raise AsrError(f"Paraformer 转录失败：{e}") from e
     finally:
         try:
             os.unlink(tmp_path)
@@ -143,6 +162,8 @@ async def _transcribe_whisper(audio_bytes: bytes, language: str) -> TranscriptSe
     from app.core.config import get_settings
 
     settings = get_settings()
+    if not settings.llm_api_key:
+        raise AsrError("ASR 未配置：LLM_API_KEY 为空，无法调用 Whisper 转录服务")
     client = openai.AsyncOpenAI(api_key=settings.llm_api_key)
 
     suffix = _detect_suffix(audio_bytes)
@@ -166,10 +187,14 @@ async def _transcribe_whisper(audio_bytes: bytes, language: str) -> TranscriptSe
                 "start": seg.start,
                 "end": seg.end,
             })
+        if not segments:
+            raise AsrError("Whisper 转录结果为空（可能是无声音频或格式不受支持）")
         return segments
+    except AsrError:
+        raise
     except Exception as e:
         logger.error(f"Whisper transcription failed: {e}")
-        return _stub_transcribe(audio_bytes)
+        raise AsrError(f"Whisper 转录失败：{e}") from e
     finally:
         try:
             os.unlink(tmp_path)

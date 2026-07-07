@@ -259,7 +259,7 @@ const plans = computed(() => [
     priceNote: '≤50人团队',
     annualNote: '≤50人团队 · 年付8折',
     popular: false,
-    cta: '立即购买',
+    cta: '联系我们开通',
     ctaClass: 'cta-orange',
     features: [
       { label: 'PPT 解析（无限）', included: true },
@@ -389,9 +389,16 @@ async function handleCta(plan: any) {
     window.open('mailto:sales@otdai.com?subject=企业版咨询', '_blank')
     return
   }
+  if (plan.id === 'elite') {
+    // PMF 阶段未接支付网关，旗舰版由商务人工开通
+    recordConversion('pricing_layout', { plan: plan.id })
+    recordConversion('upgrade_cta_copy', { plan: plan.id })
+    window.open('mailto:sales@otdai.com?subject=旗舰版开通咨询', '_blank')
+    return
+  }
   if (currentPlan.value === plan.id) return
 
-  // For pro / elite — start trial
+  // For pro — start trial
   loading.value = true
   activating.value = plan.id
   // Record A/B test conversion

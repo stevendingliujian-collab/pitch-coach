@@ -13,22 +13,25 @@ export interface ProgressEvent {
 export function useWebSocket(onMessage: (evt: ProgressEvent) => void) {
   const auth = useAuthStore()
   let ws: WebSocket | null = null
+  let disposed = false
 
   function connect() {
-    if (!auth.tenantId) return
+    if (disposed || !auth.tenantId || !auth.token) return
     const protocol = location.protocol === 'https:' ? 'wss' : 'ws'
-    ws = new WebSocket(`${protocol}://${location.host}/ws/${auth.tenantId}`)
+    const url = `${protocol}://${location.host}/ws/${auth.tenantId}?token=${encodeURIComponent(auth.token)}`
+    ws = new WebSocket(url)
     ws.onmessage = (e) => {
       try { onMessage(JSON.parse(e.data)) } catch { /* ignore */ }
     }
     ws.onclose = () => {
-      setTimeout(connect, 3000) // auto-reconnect
+      if (!disposed) setTimeout(connect, 3000) // auto-reconnect
     }
   }
 
   connect()
 
   onUnmounted(() => {
+    disposed = true
     ws?.close()
   })
 

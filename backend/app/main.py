@@ -87,8 +87,23 @@ async def health():
 
 
 @app.websocket("/ws/{tenant_id}")
-async def websocket_endpoint(websocket: WebSocket, tenant_id: int):
-    """Real-time progress push for async tasks (plan generation, scoring, etc.)"""
+async def websocket_endpoint(websocket: WebSocket, tenant_id: int, token: str = ""):
+    """Real-time progress push for async tasks (plan generation, scoring, etc.)
+
+    Requires a valid JWT (?token=...) whose tenant_id claim matches the path,
+    otherwise any client could subscribe to another tenant's progress events.
+    """
+    from app.core.security import decode_token
+
+    try:
+        payload = decode_token(token)
+    except Exception:
+        await websocket.close(code=4401)
+        return
+    if payload.get("tenant_id") != tenant_id:
+        await websocket.close(code=4403)
+        return
+
     await ws_manager.connect(websocket, tenant_id)
     try:
         while True:

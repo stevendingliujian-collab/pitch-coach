@@ -15,6 +15,11 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+
+class TtsError(RuntimeError):
+    """Raised when speech synthesis fails. Callers must surface this to the
+    user instead of delivering silent placeholder audio."""
+
 # ---------------------------------------------------------------------------
 # Voice presets: provider-specific.  The frontend uses display name → voice_id.
 # For Fish Audio, voice_id is a UUID-like hash.
@@ -73,13 +78,19 @@ async def text_to_speech(
     speed: float = 1.0,
     fmt: str = "mp3",
 ) -> bytes:
-    """Convert text to speech. Returns raw audio bytes (MP3 or WAV)."""
+    """Convert text to speech. Returns raw audio bytes (MP3 or WAV).
+
+    Raises TtsError when the configured provider is misconfigured or fails.
+    Only TTS_PROVIDER=stub (an explicit dev/test choice) returns silent audio.
+    """
     from app.core.config import get_settings
     settings = get_settings()
 
     provider = settings.tts_provider.lower()
 
-    if provider == "fish_audio" and settings.fish_audio_api_key:
+    if provider == "fish_audio":
+        if not settings.fish_audio_api_key:
+            raise TtsError("TTS 未配置：FISH_AUDIO_API_KEY 为空，无法生成示范音频")
         return await _fish_audio_tts(
             text=text,
             voice_id=voice_id or next(iter(_FISH_AUDIO_PRESETS.values())),
@@ -89,7 +100,11 @@ async def text_to_speech(
             base_url=settings.fish_audio_base_url,
         )
 
-    if provider == "xfyun" and settings.xfyun_app_id and settings.xfyun_api_key and settings.xfyun_api_secret:
+    if provider == "xfyun":
+        if not (settings.xfyun_app_id and settings.xfyun_api_key and settings.xfyun_api_secret):
+            raise TtsError(
+                "TTS 未配置：XFYUN_APP_ID / XFYUN_API_KEY / XFYUN_API_SECRET 不完整，无法生成示范音频"
+            )
         return await _xfyun_tts(
             text=text,
             voice_id=voice_id or _XFYUN_DEFAULT_VOICE,
@@ -99,8 +114,11 @@ async def text_to_speech(
             api_secret=settings.xfyun_api_secret,
         )
 
-    logger.warning("TTS_PROVIDER=%s or missing API credentials — using stub TTS", provider)
-    return _stub_wav(max(1.0, len(text) / 200 * 3))
+    if provider == "stub":
+        logger.warning("TTS_PROVIDER=stub — returning silent placeholder audio")
+        return _stub_wav(max(1.0, len(text) / 200 * 3))
+
+    raise TtsError(f"未知的 TTS_PROVIDER '{provider}'（可选: fish_audio / xfyun / stub）")
 
 
 async def _fish_audio_tts(
@@ -128,14 +146,25 @@ async def _fish_audio_tts(
     # Fish Audio doesn't support speed natively; we'll apply FFmpeg post-hoc
     # if speed != 1.0. For now, store the intent and handle in Celery task.
 
-    async with httpx.AsyncClient(timeout=120) as client:
-        async with client.stream("POST", url, json=payload, headers=headers) as resp:
-            resp.raise_for_status()
-            chunks: list[bytes] = []
-            async for chunk in resp.aiter_bytes():
-                if chunk:
-                    chunks.append(chunk)
-    return b"".join(chunks)
+    try:
+        async with httpx.AsyncClient(timeout=120) as client:
+            async with client.stream("POST", url, json=payload, headers=headers) as resp:
+                resp.raise_for_status()
+                chunks: list[bytes] = []
+                async for chunk in resp.aiter_bytes():
+                    if chunk:
+                        chunks.append(chunk)
+    except httpx.HTTPStatusError as e:
+        logger.error("Fish Audio TTS HTTP error %s", e.response.status_code)
+        raise TtsError(f"Fish Audio 合成失败（HTTP {e.response.status_code}），请稍后重试") from e
+    except Exception as e:
+        logger.error("Fish Audio TTS failed: %s", e)
+        raise TtsError(f"Fish Audio 合成失败：{e}") from e
+
+    audio = b"".join(chunks)
+    if not audio:
+        raise TtsError("Fish Audio 返回了空音频")
+    return audio
 
 
 # ---------------------------------------------------------------------------
@@ -229,23 +258,24 @@ async def _xfyun_tts(
         if code != 0:
             msg = result.get("message", "unknown error")
             logger.error("iFlytek TTS error code=%s msg=%s", code, msg)
-            # Fallback to stub on API-level error
-            return _stub_wav(max(1.0, len(text) / 200 * 3))
+            raise TtsError(f"讯飞语音合成失败（code={code}: {msg}）")
 
         # Collect audio: result["data"]["audio"] is base64 MP3
         audio_b64 = result.get("data", {}).get("audio", "")
         if not audio_b64:
             logger.error("iFlytek TTS: empty audio in response")
-            return _stub_wav(max(1.0, len(text) / 200 * 3))
+            raise TtsError("讯飞语音合成返回了空音频")
 
         return base64.b64decode(audio_b64)
 
+    except TtsError:
+        raise
     except httpx.HTTPStatusError as e:
         logger.error("iFlytek TTS HTTP error %s: %s", e.response.status_code, e.response.text[:200])
-        return _stub_wav(max(1.0, len(text) / 200 * 3))
+        raise TtsError(f"讯飞语音合成失败（HTTP {e.response.status_code}），请稍后重试") from e
     except Exception as e:
         logger.error("iFlytek TTS failed: %s", e)
-        return _stub_wav(max(1.0, len(text) / 200 * 3))
+        raise TtsError(f"讯飞语音合成失败：{e}") from e
 
 
 def _stub_wav(duration_sec: float = 2.0) -> bytes:

@@ -170,27 +170,37 @@ async def record_event(
 async def get_test_results(
     test_name: str,
     db: AsyncSession,
+    tenant_id: int | None = None,
 ) -> dict:
     """
     Return per-variant assignment counts + conversion counts.
     Conversion = event_type == "conversion".
+
+    tenant_id scopes the stats to one tenant — tenant-facing endpoints must
+    pass it so one tenant's admins never see platform-wide data.
     """
     from sqlalchemy import func
 
     # Assignment counts per variant
-    assign_rows = await db.execute(
+    assign_stmt = (
         select(AbTestAssignment.variant, func.count().label("assigned"))
         .where(AbTestAssignment.test_name == test_name)
         .group_by(AbTestAssignment.variant)
     )
+    if tenant_id is not None:
+        assign_stmt = assign_stmt.where(AbTestAssignment.tenant_id == tenant_id)
+    assign_rows = await db.execute(assign_stmt)
     assign_map: dict[str, int] = {row.variant: row.assigned for row in assign_rows}
 
     # Conversion counts per variant
-    conv_rows = await db.execute(
+    conv_stmt = (
         select(AbTestEvent.variant, func.count().label("conversions"))
         .where(AbTestEvent.test_name == test_name, AbTestEvent.event_type == "conversion")
         .group_by(AbTestEvent.variant)
     )
+    if tenant_id is not None:
+        conv_stmt = conv_stmt.where(AbTestEvent.tenant_id == tenant_id)
+    conv_rows = await db.execute(conv_stmt)
     conv_map: dict[str, int] = {row.variant: row.conversions for row in conv_rows}
 
     variants = sorted(set(assign_map) | set(conv_map))

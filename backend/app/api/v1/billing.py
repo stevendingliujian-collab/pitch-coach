@@ -160,6 +160,16 @@ async def upgrade_subscription(
     Simulate upgrading / purchasing a subscription.
     In production, this would return a payment URL instead.
     """
+    from app.core.config import get_settings
+
+    if not get_settings().billing_purchase_enabled:
+        # 未接真实支付网关前禁止自助"购买"（否则等于免费开通最高套餐）。
+        # PMF 阶段由运营人工为试用客户开通订阅。
+        raise HTTPException(
+            status_code=403,
+            detail="线上购买暂未开放，请联系我们为您开通（support@example.com）",
+        )
+
     if body.plan_type not in PLANS:
         raise HTTPException(status_code=400, detail=f"Unknown plan: {body.plan_type}")
     if body.plan_type == "free":
@@ -205,6 +215,10 @@ async def cancel_plan(
     db: AsyncSession = Depends(get_db),
 ):
     """Cancel subscription at end of current period."""
+    # 取消订阅影响整个租户，仅限管理角色操作
+    if current_user.role not in ("owner", "admin", "manager"):
+        raise HTTPException(status_code=403, detail="仅管理员可取消订阅")
+
     sub = await _get_or_create_sub(current_user.tenant_id, db)
 
     if sub.status not in ("active", "trial"):

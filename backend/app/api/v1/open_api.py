@@ -805,7 +805,7 @@ async def mcp_log_practice(
     MCP Tool: 从外部系统记录一次练习事件（用于统计，不含真实录音）。
     认证：Authorization: Bearer pc_live_<key>
     """
-    from app.models.rehearsal import Rehearsal
+    from app.models.rehearsal import Rehearsal, EXTERNAL_MCP_AUDIO_URL
     from app.models.pitch_task import PitchTask
     from app.models.user import PcUser as UserModel
 
@@ -834,7 +834,7 @@ async def mcp_log_practice(
         tenant_id=tenant_id,
         user_id=int(user_id),
         pitch_task_id=int(task_id),
-        audio_url="external://mcp_log",   # sentinel URL indicating external log
+        audio_url=EXTERNAL_MCP_AUDIO_URL,   # sentinel URL indicating external log
         duration_sec=int(duration_sec),
         total_score=float(score) if score is not None else None,
         status=3,  # scored/complete

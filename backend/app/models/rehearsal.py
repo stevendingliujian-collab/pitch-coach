@@ -5,6 +5,11 @@ from sqlalchemy import (BigInteger, String, SmallInteger, Integer, DateTime,
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
+# Sentinel audio_url for practice results logged via the Open API (MCP tools).
+# These rows carry externally reported scores, not platform-verified rehearsals,
+# and must be excluded from dashboards / leaderboards / ROI aggregations.
+EXTERNAL_MCP_AUDIO_URL = "external://mcp_log"
+
 
 class Rehearsal(Base):
     __tablename__ = "rehearsal"

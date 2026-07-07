@@ -137,4 +137,6 @@ async def get_results(
     """
     if current_user.role not in ("admin", "manager"):
         raise HTTPException(403, "Only admins and managers can view A/B test results")
-    return await ab_test_service.get_test_results(test_name, db)
+    return await ab_test_service.get_test_results(
+        test_name, db, tenant_id=current_user.tenant_id
+    )
