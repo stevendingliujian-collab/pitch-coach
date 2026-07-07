@@ -272,6 +272,9 @@ async def get_coverage(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # 校验评分表属于当前租户（否则可遍历 id 读取他租户数据）
+    await _get_rubric_or_404(rubric_id, current_user.tenant_id, db)
+
     existing = await db.execute(
         select(RubricScore).where(
             RubricScore.rubric_id == rubric_id,

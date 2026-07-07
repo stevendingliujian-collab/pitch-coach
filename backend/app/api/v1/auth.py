@@ -391,8 +391,13 @@ async def wechat_callback(body: WechatCallbackRequest, db: AsyncSession = Depend
     """
     settings = get_settings()
 
-    # --- 开发 stub：直接用 code 作为 unionid 测试 ---
+    # --- 开发 stub：直接用 code 作为 unionid 测试（严禁在生产环境生效）---
     if not settings.wechat_app_id:
+        if settings.is_production:
+            raise HTTPException(
+                status_code=503,
+                detail="微信登录未配置（WECHAT_APP_ID 为空），请使用其他登录方式",
+            )
         unionid = f"stub_unionid_{body.code}"
         openid = f"stub_openid_{body.code}"
         wx_name = "微信用户"
@@ -589,6 +594,10 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """首次使用软引导信息提交（行业/角色/姓名，全部可选）。"""
+    # 仅允许写入软引导的职业角色值。role 列同时承担 RBAC 权限判定
+    # （owner/admin/manager 等），绝不能由用户经此接口自选，否则可自我提权。
+    ONBOARDING_ROLES = {"pre_sales", "technical", "sales_mgr", "pm", "presenter"}
+
     changed = False
     if body.name is not None:
         current_user.name = body.name
@@ -597,8 +606,14 @@ async def update_profile(
         current_user.industry = body.industry
         changed = True
     if body.role is not None:
-        current_user.role = body.role
-        changed = True
+        if body.role not in ONBOARDING_ROLES:
+            raise HTTPException(status_code=422, detail="无效的角色选项")
+        # 已具备管理权限的账号不因引导流程被降级
+        if current_user.role in ("owner", "admin", "manager"):
+            pass
+        else:
+            current_user.role = body.role
+            changed = True
     if changed:
         current_user.recalculate_completeness()
         await db.commit()

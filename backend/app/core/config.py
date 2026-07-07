@@ -89,6 +89,11 @@ class Settings(BaseSettings):
     asr_provider: str = "paraformer"
     paraformer_api_key: str = ""
 
+    # Billing — PMF 阶段未接真实支付网关，线上购买默认关闭。
+    # 接入支付渠道（下单 → 回调验签 → 激活）之前不要打开，否则任何用户
+    # 都能免费"购买"最高套餐。
+    billing_purchase_enabled: bool = False
+
     # App
     app_env: str = "development"
     cors_origins: str = "http://localhost:5173,http://localhost:3000"
@@ -96,6 +101,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",")]
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.lower() in ("production", "prod")
 
     # File upload limits
     max_ppt_size_mb: int = 50
@@ -105,6 +114,11 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     s = Settings()
+    if s.is_production and s.secret_key == "change-me-in-production":
+        raise RuntimeError(
+            "SECRET_KEY is still the default value. Set a strong SECRET_KEY "
+            "in the environment before running with APP_ENV=production."
+        )
     # Merge our domains into existing NO_PROXY so domestic APIs bypass the system proxy
     existing = os.environ.get("NO_PROXY", "") or os.environ.get("no_proxy", "")
     extra = [d for d in s.no_proxy.split(",") if d not in existing]

@@ -9,7 +9,7 @@
  * The axios interceptor in api/index.ts calls show() on 402 responses.
  */
 import { ref, readonly } from 'vue'
-import { ElMessage } from 'element-plus'
+import router from '@/router'
 
 interface BannerPayload {
   feature: string
@@ -76,12 +76,7 @@ export function useUpgradeBanner() {
         api.post('/conversion/events', { event_name: 'upgrade_clicked', properties: { trigger_id: tid } }).catch(() => {})
       })
     }
-    // P2: navigate to /pricing. For now show info message.
-    ElMessage({
-      message: '定价与订阅功能将在 P2 版本正式上线，敬请期待！',
-      type: 'info',
-      duration: 3000,
-    })
+    router.push('/pricing')
     _visible.value = false
     _triggerId.value = null
     if (_dismissTimer) clearTimeout(_dismissTimer)
