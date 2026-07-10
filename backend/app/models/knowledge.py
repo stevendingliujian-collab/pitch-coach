@@ -47,6 +47,11 @@ class KnowledgeChunk(Base):
     tenant_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Space-joined jieba tokens of `content`, so to_tsvector('simple', …) can
+    # match Chinese queries without a DB-side segmenter extension. Populated at
+    # ingestion; nullable so pre-existing rows keep working (search falls back
+    # to `content`). Re-ingest old docs to enable Chinese FTS on them.
+    search_tokens: Mapped[str | None] = mapped_column(Text)
     content_type: Mapped[str] = mapped_column(String(16), nullable=False, default="text")
     heading: Mapped[str | None] = mapped_column(String(256))
     page_number: Mapped[int | None] = mapped_column(Integer)

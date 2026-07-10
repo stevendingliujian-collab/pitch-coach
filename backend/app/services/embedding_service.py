@@ -1,8 +1,11 @@
 """
-Embedding service: DashScope text-embedding-v3 API + Qdrant vector store operations.
+Embedding service: OpenAI-compatible embedding API + Qdrant vector store operations.
 
 Architecture:
-  - Embeddings: DashScope compatible-mode API (OpenAI-style), model text-embedding-v3, 1024-dim
+  - Embeddings: OpenAI-compatible API; model and dimension are config-driven via
+    EMBEDDING_MODEL / EMBEDDING_DIM / EMBEDDING_BASE_URL (defaults:
+    qwen3-embedding-8b, 4096-dim). The Qdrant collection is created with
+    EMBEDDING_DIM, so model and dim must stay in sync.
   - Vector store: Qdrant (single container, no dependencies)
   - Collection name: "knowledge_chunks" (one collection for all tenants; tenant_id in payload)
 """
@@ -48,8 +51,8 @@ SEARCH_TOP_K = 20        # candidates before RRF merge
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:
     """
-    Embed a list of texts using DashScope text-embedding-v3 (OpenAI-compatible).
-    Returns a list of 1024-dim float vectors, same order as input.
+    Embed a list of texts via the configured OpenAI-compatible embedding API.
+    Returns a list of EMBEDDING_DIM-dim float vectors, same order as input.
     Batches automatically if len(texts) > BATCH_SIZE.
     """
     if not texts:
@@ -221,8 +224,6 @@ async def vector_search(
     query: str,
     tenant_id: int,
     top_k: int = SEARCH_TOP_K,
-    doc_type: str | None = None,
-    industry: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Embed query and search Qdrant for similar chunks within tenant scope.
@@ -230,6 +231,10 @@ async def vector_search(
     Returns list of dicts with keys:
         chunk_id, doc_id, score, content, heading, page_number, content_type
     Sorted by descending score.
+
+    Note: doc_type / industry filtering is applied by the caller
+    (hybrid_search) against the allowed doc_id set, since those fields are not
+    stored in the Qdrant payload.
     """
     await ensure_collection()
     client = get_qdrant_client()

@@ -41,6 +41,9 @@ tenacity==9.0.0
 # Vector store
 qdrant-client==1.9.1
 
+# Chinese word segmentation for full-text search
+jieba==0.42.1
+
 # Utils
 pydantic==2.9.2
 pydantic-settings==2.5.2

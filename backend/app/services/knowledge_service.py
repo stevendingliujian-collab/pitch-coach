@@ -302,12 +302,14 @@ async def ingest_document(
 
         # 5. Insert chunk rows into PostgreSQL (to get chunk IDs)
         db_chunks: list[KnowledgeChunk] = []
+        from app.services.text_tokenizer import tokenize_for_search
         for idx, c in enumerate(raw_chunks):
             chunk = KnowledgeChunk(
                 doc_id=doc_id,
                 tenant_id=doc.tenant_id,
                 chunk_index=idx,
                 content=c["content"],
+                search_tokens=tokenize_for_search(c["content"]),
                 content_type=c["content_type"],
                 heading=c["heading"],
                 page_number=c["page_number"],
@@ -371,12 +373,16 @@ async def keyword_search(
     Full-text search using PostgreSQL tsvector (Chinese + English).
     Falls back to ILIKE if no tsvector match.
     """
-    # Build tsquery: split on whitespace, join with &
-    words = query.strip().split()
-    if not words:
+    if not query.strip():
         return []
 
-    # Try plainto_tsquery first (handles Chinese tokenization via pg_jieba if available)
+    # Segment the query with the same tokenizer used at ingestion, so a Chinese
+    # query matches the space-joined tokens stored in search_tokens. Match
+    # against coalesce(search_tokens, content) so rows ingested before this
+    # column existed still work (degraded to raw-content matching).
+    from app.services.text_tokenizer import tokenize_for_search
+    tokenized_query = tokenize_for_search(query)
+
     try:
         sql = text(
             """
@@ -387,17 +393,21 @@ async def keyword_search(
                 kc.heading,
                 kc.page_number,
                 kc.content_type,
-                ts_rank_cd(to_tsvector('simple', kc.content), plainto_tsquery('simple', :query)) AS rank
+                ts_rank_cd(
+                    to_tsvector('simple', coalesce(kc.search_tokens, kc.content)),
+                    plainto_tsquery('simple', :query)
+                ) AS rank
             FROM knowledge_chunk kc
             JOIN knowledge_document kd ON kd.id = kc.doc_id
             WHERE kd.tenant_id = :tenant_id
               AND kd.embedding_status = 2
-              AND to_tsvector('simple', kc.content) @@ plainto_tsquery('simple', :query)
+              AND to_tsvector('simple', coalesce(kc.search_tokens, kc.content))
+                  @@ plainto_tsquery('simple', :query)
             ORDER BY rank DESC
             LIMIT :top_k
             """
         )
-        result = await db.execute(sql, {"query": query, "tenant_id": tenant_id, "top_k": top_k})
+        result = await db.execute(sql, {"query": tokenized_query, "tenant_id": tenant_id, "top_k": top_k})
         rows = result.fetchall()
 
         if rows:
@@ -505,10 +515,30 @@ async def hybrid_search(
     """
     Hybrid search: vector similarity (Qdrant) + keyword (PostgreSQL) → RRF.
     Returns top_n chunks with rrf_score, content, heading, etc.
+
+    doc_type / industry, when given, restrict results to matching documents.
+    The filter is applied by resolving the allowed doc_ids once and filtering
+    both hit lists, so it is correct regardless of the search backend (the
+    Qdrant payload does not carry these fields).
     """
+    # Resolve the set of allowed doc_ids for doc_type / industry filtering.
+    allowed_doc_ids: set[int] | None = None
+    if doc_type or industry:
+        from sqlalchemy import select as _select
+        from app.models.knowledge import KnowledgeDocument
+        stmt = _select(KnowledgeDocument.id).where(KnowledgeDocument.tenant_id == tenant_id)
+        if doc_type:
+            stmt = stmt.where(KnowledgeDocument.doc_type == doc_type)
+        if industry:
+            stmt = stmt.where(KnowledgeDocument.industry == industry)
+        rows = await db.execute(stmt)
+        allowed_doc_ids = {r[0] for r in rows}
+        if not allowed_doc_ids:
+            return []
+
     # Run both searches concurrently
     vector_task = asyncio.create_task(
-        vector_search(query, tenant_id, top_k=20, doc_type=doc_type, industry=industry)
+        vector_search(query, tenant_id, top_k=20)
     )
     keyword_task = asyncio.create_task(
         keyword_search(query, tenant_id, db, top_k=20)
@@ -521,6 +551,10 @@ async def hybrid_search(
         logger.warning(f"Vector search failed, using keyword only: {e}")
         keyword_hits = await keyword_search(query, tenant_id, db, top_k=20)
         vector_hits = []
+
+    if allowed_doc_ids is not None:
+        vector_hits = [h for h in vector_hits if h.get("doc_id") in allowed_doc_ids]
+        keyword_hits = [h for h in keyword_hits if h.get("doc_id") in allowed_doc_ids]
 
     return _rrf_merge(vector_hits, keyword_hits, top_n=top_n)
 
