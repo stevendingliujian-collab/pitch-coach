@@ -8,7 +8,7 @@ from app.core.security import get_current_user
 from app.core.storage import get_presigned_upload_url, get_presigned_download_url
 from app.models.user import User
 from app.models.pitch_task import PitchTask
-from app.models.rehearsal import Rehearsal
+from app.models.rehearsal import Rehearsal, STATUS_FAILED
 from app.schemas.rehearsal import (
     StartRehearsalRequest, StartRehearsalResponse,
     CompleteRehearsalRequest, RehearsalStatusResponse,
@@ -103,6 +103,7 @@ async def get_rehearsal_status(
         fluency_score=_dim(rehearsal, "fluency"),
         rate_score=_dim(rehearsal, "rate"),
         timing_score=_dim(rehearsal, "timing"),
+        error_msg=rehearsal.error_msg,
     )
 
 
@@ -113,6 +114,8 @@ async def get_rehearsal_report(
     db: AsyncSession = Depends(get_db),
 ):
     rehearsal = await _get_rehearsal(rehearsal_id, current_user, db)
+    if rehearsal.status == STATUS_FAILED:
+        raise HTTPException(422, rehearsal.error_msg or "评分失败，请重新排练")
     if rehearsal.status < 3:
         raise HTTPException(409, "scoring not complete yet")
 

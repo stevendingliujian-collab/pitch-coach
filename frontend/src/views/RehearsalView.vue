@@ -118,7 +118,7 @@
         </div>
         <div v-else-if="scoringFailed" class="upload-done">
           <el-icon color="#F56C6C"><CircleClose /></el-icon>
-          <span>评分失败：转录或评分服务暂时不可用，本次录音已保存，请稍后重试</span>
+          <span>{{ scoreErrorMsg || '评分失败：转录或评分服务暂时不可用，本次录音已保存，请稍后重试' }}</span>
           <el-button @click="goBack">返回项目</el-button>
         </div>
         <div v-else class="upload-done">
@@ -164,6 +164,7 @@ const rehearsalId = ref<number | null>(null)
 const objectKey = ref('')
 const rehearsalScored = ref(false)
 const scoringFailed = ref(false)
+const scoreErrorMsg = ref('')
 let pollingHandle: ReturnType<typeof setInterval> | null = null
 
 const recorder = useRehearsalRecorder()
@@ -251,8 +252,9 @@ function startPolling() {
     if (!rehearsalId.value) return
     try {
       const res = await rehearsalApi.getStatus(rehearsalId.value)
-      if (res.data.status === 6) {
+      if (res.data.status === 7) {
         scoringFailed.value = true
+        scoreErrorMsg.value = res.data.error_msg || ''
         if (pollingHandle) clearInterval(pollingHandle)
       } else if (res.data.status >= 3) {
         rehearsalScored.value = true

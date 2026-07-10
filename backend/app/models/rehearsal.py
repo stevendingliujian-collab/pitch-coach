@@ -10,6 +10,15 @@ from app.core.database import Base
 # and must be excluded from dashboards / leaderboards / ROI aggregations.
 EXTERNAL_MCP_AUDIO_URL = "external://mcp_log"
 
+# Rehearsal.status values.
+#   0=录制中 1=转录中 2=评分中 3=已评分 4=已提交审核 5=已通过认证
+#   6=需改进（经理驳回认证）  7=评分失败（转录/评分环节出错，无有效分数）
+# Status 7 is distinct from 6: a manager-rejected rehearsal (6) has a real
+# score, whereas a failed one (7) has none and must not pollute aggregations.
+STATUS_SCORED = 3
+STATUS_NEEDS_IMPROVEMENT = 6
+STATUS_FAILED = 7
+
 
 class Rehearsal(Base):
     __tablename__ = "rehearsal"
@@ -35,8 +44,10 @@ class Rehearsal(Base):
     filler_word_count: Mapped[int | None] = mapped_column(Integer)
     filler_word_detail: Mapped[list | None] = mapped_column(JSON)
 
-    # 0=录制中 1=转录中 2=评分中 3=已评分 4=已提交审核 5=已通过认证 6=需改进
+    # See status constants above: 0..7
     status: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    # Populated when status=7 (scoring failed): user-facing reason for the failure.
+    error_msg: Mapped[str | None] = mapped_column(String(512))
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())

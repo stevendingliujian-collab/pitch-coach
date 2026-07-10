@@ -10,7 +10,7 @@
     </div>
 
     <div v-else-if="!report" class="empty-state">
-      <el-empty description="报告不存在或评分尚未完成" />
+      <el-empty :description="failureMsg || '报告不存在或评分尚未完成'" />
       <el-button @click="router.back()">返回</el-button>
     </div>
 
@@ -154,6 +154,7 @@ const { checkTrigger, trackEvent } = useConversion()
 
 const loading = ref(true)
 const report = ref<RehearsalReport | null>(null)
+const failureMsg = ref('')
 
 onMounted(async () => {
   try {
@@ -174,7 +175,13 @@ onMounted(async () => {
     // T5: after 3 rehearsals, nudge user to see progress curve (premium feature)
     checkTrigger('T5', { rehearsal_id: rehearsalId, score: res.data.total_score })
 
-  } catch { /* 404 or not scored yet */ } finally {
+  } catch (e: any) {
+    // 422 = scoring failed; surface the backend's reason (transcription/scoring error)
+    if (e?.response?.status === 422) {
+      failureMsg.value = e.response.data?.detail || '评分失败，请重新排练'
+    }
+    /* other errors (404 / not scored yet) fall through to the generic empty state */
+  } finally {
     loading.value = false
   }
 })

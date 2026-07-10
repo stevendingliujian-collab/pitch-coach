@@ -105,6 +105,7 @@ function statusLabel(status: number) {
     4: '已提交审核',
     5: '已认证',
     6: '需改进',
+    7: '评分失败',
   }
   return map[status] ?? '未知'
 }
@@ -112,6 +113,7 @@ function statusLabel(status: number) {
 function statusTagType(status: number): '' | 'success' | 'warning' | 'danger' | 'info' {
   if (status === 3 || status === 4 || status === 5) return 'success'
   if (status === 6) return 'warning'
+  if (status === 7) return 'danger'
   if (status <= 2) return 'info'
   return ''
 }
@@ -198,6 +200,7 @@ function formatDuration(sec: number) {
 .status-0, .status-1, .status-2 { background: #EEF2FF; color: #6366F1; }
 .status-3, .status-4, .status-5 { background: #F0FDF4; color: #16A34A; }
 .status-6 { background: #FFF7ED; color: #C2410C; }
+.status-7 { background: #FEF2F2; color: #DC2626; }
 
 .row-info { flex: 1; }
 .row-time { font-size: 14px; font-weight: 500; color: var(--t-primary); }

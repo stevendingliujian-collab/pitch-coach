@@ -20,7 +20,7 @@ from sqlalchemy import select, func, and_
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
-from app.models.rehearsal import Rehearsal, EXTERNAL_MCP_AUDIO_URL
+from app.models.rehearsal import Rehearsal, EXTERNAL_MCP_AUDIO_URL, STATUS_FAILED
 from app.models.pitch_task import PitchTask
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -55,6 +55,7 @@ async def get_overview(
         ).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
             Rehearsal.created_at >= month_start,
         )
@@ -69,6 +70,7 @@ async def get_overview(
         select(func.count(Rehearsal.id)).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
         )
     )
@@ -115,6 +117,7 @@ async def get_trend(
         ).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
             Rehearsal.created_at >= since,
         ).group_by(func.date(Rehearsal.created_at))
@@ -161,6 +164,7 @@ async def get_member_stats(
         ).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
         ).group_by(Rehearsal.user_id)
         .order_by(func.avg(Rehearsal.total_score).desc().nulls_last())
@@ -220,6 +224,7 @@ async def get_task_readiness(
         ).where(
             Rehearsal.pitch_task_id.in_(task_ids),
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
         ).group_by(Rehearsal.pitch_task_id)
     )
@@ -282,6 +287,7 @@ async def get_roi(
         select(func.sum(Rehearsal.audio_duration)).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
         )
     )
@@ -294,6 +300,7 @@ async def get_roi(
         select(func.avg(Rehearsal.total_score)).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
             Rehearsal.total_score.isnot(None),
         ).order_by(Rehearsal.created_at.asc()).limit(5)
@@ -306,6 +313,7 @@ async def get_roi(
         select(func.avg(Rehearsal.total_score)).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
             Rehearsal.total_score.isnot(None),
             Rehearsal.created_at >= since_30,
@@ -347,6 +355,7 @@ async def get_roi(
         select(func.count(Rehearsal.id)).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
         )
     )
@@ -389,6 +398,7 @@ async def get_benchmark(
         select(func.avg(Rehearsal.total_score)).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
             Rehearsal.total_score.isnot(None),
             Rehearsal.created_at >= since_30,
@@ -401,6 +411,7 @@ async def get_benchmark(
         select(func.count(Rehearsal.id)).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
             Rehearsal.created_at >= since_30,
         )
@@ -528,6 +539,7 @@ async def get_funnel(
         select(func.count(func.distinct(Rehearsal.user_id))).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
             Rehearsal.created_at >= since,
         )
@@ -540,6 +552,7 @@ async def get_funnel(
         .where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.audio_url != EXTERNAL_MCP_AUDIO_URL,
             Rehearsal.created_at >= since,
         )
