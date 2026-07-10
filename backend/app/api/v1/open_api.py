@@ -634,7 +634,7 @@ async def mcp_check_readiness(
 
     from app.models.pitch_task import PitchTask
     from app.models.pitch_plan import PitchPlan
-    from app.models.rehearsal import Rehearsal
+    from app.models.rehearsal import Rehearsal, STATUS_FAILED
     from app.models.narration import DemoNarration
     from app.models.review import Certification
     from app.models.evaluator import QASession
@@ -685,6 +685,7 @@ async def mcp_check_readiness(
             Rehearsal.pitch_task_id == task_id,
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
         )
     )
     reh_row = reh_agg.one()
@@ -754,7 +755,7 @@ async def mcp_get_practice_status(
     MCP Tool: 获取租户整体练习状态统计。
     认证：Authorization: Bearer pc_live_<key>
     """
-    from app.models.rehearsal import Rehearsal
+    from app.models.rehearsal import Rehearsal, STATUS_FAILED
 
     days = int(body.get("days", 30))
     since = datetime.utcnow() - timedelta(days=days)
@@ -769,6 +770,7 @@ async def mcp_get_practice_status(
         ).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.created_at >= since,
         )
     )
@@ -780,6 +782,7 @@ async def mcp_get_practice_status(
         select(func.count(func.distinct(cast(Rehearsal.created_at, Date)))).where(
             Rehearsal.tenant_id == tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
             Rehearsal.created_at >= since,
         )
     )

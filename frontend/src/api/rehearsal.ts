@@ -28,6 +28,7 @@ export interface RehearsalStatus {
   fluency_score: number | null
   rate_score: number | null
   timing_score: number | null
+  error_msg?: string | null   // populated when status=7 (scoring failed)
 }
 
 export interface RehearsalReport extends RehearsalStatus {

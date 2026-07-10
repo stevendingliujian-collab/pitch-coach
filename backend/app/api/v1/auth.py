@@ -594,9 +594,7 @@ async def update_profile(
     db: AsyncSession = Depends(get_db),
 ):
     """首次使用软引导信息提交（行业/角色/姓名，全部可选）。"""
-    # 仅允许写入软引导的职业角色值。role 列同时承担 RBAC 权限判定
-    # （owner/admin/manager 等），绝不能由用户经此接口自选，否则可自我提权。
-    ONBOARDING_ROLES = {"pre_sales", "technical", "sales_mgr", "pm", "presenter"}
+    from app.core.authz import resolve_onboarding_role, InvalidRoleError
 
     changed = False
     if body.name is not None:
@@ -606,13 +604,14 @@ async def update_profile(
         current_user.industry = body.industry
         changed = True
     if body.role is not None:
-        if body.role not in ONBOARDING_ROLES:
+        # role 列同时承担 RBAC 权限判定，绝不能由用户经此接口自选（否则可自我
+        # 提权）。resolve_onboarding_role 只允许职业角色，且不降级管理账号。
+        try:
+            new_role = resolve_onboarding_role(current_user.role, body.role)
+        except InvalidRoleError:
             raise HTTPException(status_code=422, detail="无效的角色选项")
-        # 已具备管理权限的账号不因引导流程被降级
-        if current_user.role in ("owner", "admin", "manager"):
-            pass
-        else:
-            current_user.role = body.role
+        if new_role is not None:
+            current_user.role = new_role
             changed = True
     if changed:
         current_user.recalculate_completeness()

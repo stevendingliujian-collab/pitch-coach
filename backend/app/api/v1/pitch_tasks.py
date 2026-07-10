@@ -5,7 +5,7 @@ from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import User
 from app.models.pitch_task import PitchTask
-from app.models.rehearsal import Rehearsal
+from app.models.rehearsal import Rehearsal, STATUS_FAILED
 from app.schemas.pitch_task import PitchTaskCreate, PitchTaskUpdate, PitchTaskResponse
 from app.services.quota_service import increment_usage
 from app.services.conversion_service import track_event
@@ -51,6 +51,7 @@ async def list_tasks(
         .where(
             Rehearsal.pitch_task_id.in_(task_ids),
             Rehearsal.status >= 3,  # scored or beyond
+            Rehearsal.status != STATUS_FAILED,
         )
         .group_by(Rehearsal.pitch_task_id)
     )
@@ -272,6 +273,7 @@ async def get_readiness(
             Rehearsal.pitch_task_id == task_id,
             Rehearsal.tenant_id == current_user.tenant_id,
             Rehearsal.status >= 3,
+            Rehearsal.status != STATUS_FAILED,
         )
     )
     reh_row = reh_agg.one()

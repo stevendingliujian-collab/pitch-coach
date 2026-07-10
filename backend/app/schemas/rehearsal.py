@@ -37,6 +37,7 @@ class RehearsalStatusResponse(BaseModel):
     fluency_score: float | None = None
     rate_score: float | None = None
     timing_score: float | None = None
+    error_msg: str | None = None    # populated when status=7 (scoring failed)
 
 
 class FillerWordDetail(BaseModel):

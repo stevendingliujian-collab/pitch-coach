@@ -288,9 +288,24 @@ async def _score_rehearsal(task: Task, rehearsal_id: int):
             await progress(100, "done")
 
         except Exception as exc:
-            rehearsal.status = 6  # error / needs improvement
+            from app.services.asr_adapter import AsrError
+            from app.models.rehearsal import STATUS_FAILED
+
+            # status=7 (failed) — distinct from 6 (manager marked "needs
+            # improvement"), which has a real score. A failed rehearsal has none.
+            rehearsal.status = STATUS_FAILED
+            # AsrError already carries a user-facing Chinese message; for other
+            # errors give a generic hint plus the technical detail.
+            if isinstance(exc, AsrError):
+                rehearsal.error_msg = str(exc)[:512]
+            else:
+                rehearsal.error_msg = f"评分失败：{str(exc)[:480]}"
             await db.commit()
-            await progress(0, f"error: {str(exc)[:100]}")
+            await progress(0, f"error: {rehearsal.error_msg[:100]}")
+
+            # Config/permanent ASR failures won't succeed on retry — fail fast.
+            if isinstance(exc, AsrError):
+                return
             raise task.retry(exc=exc)
 
 

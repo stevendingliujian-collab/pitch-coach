@@ -54,7 +54,15 @@ if [ "$START_API" = 0 ]; then
   exit 0
 fi
 
-# 4. API + health check
+# 4. Celery worker — PPT 解析 / 评分 / 示范 / 复盘全靠它，否则主流程卡在"处理中"
+step "启动 Celery Worker"
+pkill -f "celery -A app.workers.celery_app worker" 2>/dev/null || true
+( cd backend && DATABASE_URL="$DB_URL" \
+    nohup celery -A app.workers.celery_app worker --loglevel=info \
+    >/tmp/pitchcoach-worker.log 2>&1 & )
+echo "  Worker 已启动（日志: /tmp/pitchcoach-worker.log）"
+
+# 5. API + health check
 step "启动 API 并做健康检查"
 pkill -f "uvicorn app.main:app.*--port $API_PORT" 2>/dev/null || true
 ( cd backend && DATABASE_URL="$DB_URL" \
@@ -64,10 +72,10 @@ for i in $(seq 1 20); do
   if curl -sf "http://127.0.0.1:$API_PORT/health" >/dev/null 2>&1; then
     printf '\n\033[1;32m✓ API 健康检查通过: http://localhost:%s/health\033[0m\n' "$API_PORT"
     echo "  API 文档: http://localhost:$API_PORT/docs"
-    echo "  日志:     tail -f /tmp/pitchcoach-api.log"
+    echo "  API 日志:    tail -f /tmp/pitchcoach-api.log"
+    echo "  Worker 日志: tail -f /tmp/pitchcoach-worker.log"
     echo
-    echo "下一步：另开终端启动 Worker 和前端"
-    echo "  cd backend && celery -A app.workers.celery_app worker --loglevel=info"
+    echo "下一步：另开终端启动前端"
     echo "  cd frontend && npm install && npm run dev"
     exit 0
   fi
